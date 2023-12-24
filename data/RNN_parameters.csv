@@ -1,4 +1,4 @@
-log name,loss,perplexity,bits per word,trainable paramters,total paramters
+log name,loss,perplexity,bits per word,trainable parameters,total parameters
 log_stats_model_1000075_2020-04-14_18-43-13_999921525.json,4.983852349,146.0358807,7.190179069,9174800,9174800
 log_stats_model_1003879_2020-04-20_03-28-25_999904944.json,4.814434755,123.2771109,6.945761146,8333200,8333200
 log_stats_model_1012397_2020-04-20_16-40-33_999956176.json,4.898284616,134.0596186,7.066730924,10134800,10134800
@@ -12343,7 +12343,7 @@ log_stats_model_1007223_2020-04-21_00-08-15_999926857.json,4.717670922,111.90730
 log_stats_model_1007704_2020-04-20_09-56-03_999964147.json,nan,nan,nan,14538000,14538000
 log_stats_model_1006968_2020-04-14_04-52-39_999912489.json,4.613832937,100.8700381,6.656353897,15339600,15339600
 log_stats_model_1002595_2020-04-20_11-10-24_999981326.json,nan,nan,nan,7453200,7453200
-log_stats_model_1008513_2020-04-14_03-32-12_999944505.json,4.821057366,124.0962366,6.955315554,12738000,12738000log name,loss,perplexity,trainable paramters,total paramters
+log_stats_model_1008513_2020-04-14_03-32-12_999944505.json,4.821057366,124.0962366,6.955315554,12738000,12738000log name,loss,perplexity,trainable parameters,total parameters
 log_stats_model_1009532_2020-04-13_04-50-42_999940095.json,nan,nan,nan,nan,nan
 log_stats_model_1009532_2020-04-13_04-50-42_999940095.json,nan,nan,nan,nan,nan
 log_stats_model_1009532_2020-04-13_04-50-42_999940095.json,nan,nan,nan,nan,nan
@@ -12444,8 +12444,8 @@ log_stats_model_1003556_2020-04-22_16-22-31_999962372.json,nan,nan,nan,nan,nan
 log_stats_model_1003556_2020-04-22_16-22-31_999962372.json,nan,nan,nan,nan,nan
 log_stats_model_1003556_2020-04-22_16-22-31_999962372.json,nan,nan,nan,nan,nan
 log_stats_model_1003556_2020-04-22_16-22-31_999962372.json,nan,nan,nan,nan,nan
-log name,loss,perplexity,trainable paramters,total paramters
-log name,loss,perplexity,trainable paramters,total paramters
-log name,loss,perplexity,trainable paramters,total paramters
-log name,loss,perplexity,trainable paramters,total paramters
-log name,loss,perplexity,trainable paramters,total paramters
+log name,loss,perplexity,trainable parameters,total parameters
+log name,loss,perplexity,trainable parameters,total parameters
+log name,loss,perplexity,trainable parameters,total parameters
+log name,loss,perplexity,trainable parameters,total parameters
+log name,loss,perplexity,trainable parameters,total parameters

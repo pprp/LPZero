@@ -4,84 +4,96 @@ import numpy as np
 import torch
 import torch.nn as nn
 
+from lpzero.model.flexibert.modeling_electra import ElectraLayer
 from . import zc_candidates
 
 
+@zc_candidates('jacobs')
+def compute_jacobs(model, inputs, targets, loss_fn, split_data=1, **kwargs) -> List:
+    jacobs = model.embeddings.position_embeddings.weight.grad.detach()
+    return jacobs
+
+
 @zc_candidates('act')
-def compute_activation(net, inputs, targets, loss_fn, split_data=1, **kwargs) -> List:
+def compute_activation(model, inputs, targets, loss_fn, split_data=1, **kwargs) -> List:
     """register the activation after each block (for resnet18 the length is 8)"""
+    act_outputs = []
 
-    act_list = []
+    def activation_hook(module, input, output):
+        act_outputs.append(output.detach())
 
-    def hook_fw_act_fn(module, input, output):
-        act_list.append(output.detach())
+    for layer in model.modules():
+        if isinstance(layer, ElectraLayer):
+            sublayer = layer.intermediate.intermediate_act_fn.register_forward_hook(
+                activation_hook
+            )
+    model(inputs)
+    return act_outputs
 
-    for name, module in net.named_modules():
-        if isinstance(module, nn.Conv2d):
-            module.register_forward_hook(hook_fw_act_fn)
 
-    _ = net(inputs)
-    return act_list
+@zc_candidates('head')
+def compute_head(model, inputs, targets, loss_fn, split_data=1, **kwargs) -> List:
+    """register the activation after each block (for resnet18 the length is 8)"""
+    head_outputs = []
+
+    def head_hook(module, input, output):
+        head_outputs.append(output.detach())
+
+    for layer in model.modules():
+        if isinstance(layer, ElectraLayer):
+            sublayer = layer.operation.operation
+            if hasattr(sublayer, 'query'):
+                sublayer.query.register_forward_hook(head_hook)
+            elif hasattr(sublayer, 'key'):
+                sublayer.key.register_forward_hook(head_hook)
+            elif hasattr(sublayer, 'value'):
+                sublayer.value.register_forward_hook(head_hook)
+            elif hasattr(sublayer, 'input'):
+                sublayer.input.register_forward_hook(head_hook)
+            elif hasattr(sublayer, 'weight'):
+                sublayer.weight.register_forward_hook(head_hook)
+
+    model(inputs)
+    return head_outputs
+
+
+@zc_candidates('softmax')
+def compute_softmax(model, inputs, targets, loss_fn, split_data=1, **kwargs) -> List:
+    """softmax output"""
+    softmax_outputs = []
+
+    def softmax_hook(module, input, output):
+        softmax_outputs.append(output.detach())
+
+    for layer in model.modules():
+        if isinstance(layer, ElectraLayer):
+            sublayer = layer.operation.operation
+            if hasattr(sublayer, 'softmax'):
+                sublayer.softmax.register_forward_hook(softmax_hook)
+    model(inputs)
+    return softmax_outputs
 
 
 @zc_candidates('grad')
-def compute_gradient(net, inputs, targets, loss_fn, split_data=1, **kwargs) -> List:
-    grad_list = []  # before relu
-
-    logits = net(inputs)
-    loss_fn(logits, targets).backward()
-
-    for layer in net.modules():
-        if isinstance(layer, nn.Conv2d):
-            grad_list.append(layer.weight.grad.detach())
-
-    return grad_list[::-1]
+def compute_gradient(model, inputs, targets, loss_fn, split_data=1, **kwargs) -> List:
+    grad_output = []
+    for layer in model.modules():
+        if isinstance(layer, ElectraLayer):
+            for sublayer in layer.operation.operation.modules():
+                if isinstance(sublayer, nn.Linear):
+                    if sublayer.weight.grad is not None:
+                        grad_output.append(sublayer.weight.grad)
+    return grad_output
 
 
 @zc_candidates('weight')
-def compute_weight(net, inputs, targets, loss_fn, split_data=1, **kwargs) -> List:
+def compute_weight(model, inputs, targets, loss_fn, split_data=1, **kwargs) -> List:
     weight_list = []
 
-    for name, module in net.named_modules():
-        if isinstance(module, nn.Conv2d):
-            weight_list.append(module.weight.detach())
-
-    _ = net(inputs)
+    for layer in model.modules():
+        if isinstance(layer, ElectraLayer):
+            for sublayer in layer.operation.operation.modules():
+                if isinstance(sublayer, nn.Linear):
+                    if sublayer.weight is not None:
+                        weight_list.append(sublayer.weight.detach())
     return weight_list
-
-
-# @zc_candidates('hessian_eigen')
-# def compute_hessian_eigen(net,
-#                           inputs,
-#                           targets,
-#                           loss_fn,
-#                           split_data=1,
-#                           **kwargs) -> List:
-#     cuda = True if torch.cuda.is_available() else False
-#     hessian_comp = hessian_per_layer_quant(
-#         model=net, criterion=loss_fn, data=(inputs, targets), cuda=cuda)
-
-#     eigens = hessian_comp.layer_eigenvalues()
-
-#     res = []
-#     for v in eigens.values():
-#         res.append(float(v))
-#     return res
-
-# @zc_candidates('hessian_trace')
-# def compute_hessian_trace(net,
-#                           inputs,
-#                           targets,
-#                           loss_fn,
-#                           split_data=1,
-#                           **kwargs) -> List:
-#     cuda = True if torch.cuda.is_available() else False
-#     hessian_comp = hessian_per_layer_quant(
-#         model=net, criterion=loss_fn, data=(inputs, targets), cuda=cuda)
-
-#     traces = hessian_comp.layer_trace()
-
-#     res = []
-#     for v in traces.values():
-#         res.append(float(v))
-#     return res
