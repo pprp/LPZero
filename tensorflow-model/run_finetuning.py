@@ -299,7 +299,10 @@ def run_finetuning(config: configure_finetuning.FinetuningConfig):
     heading_info = 'model={:}, trial {:}/{:}'.format(
         config.model_name, trial, config.num_trials
     )
-    def heading(msg): return utils.heading(msg + ': ' + heading_info)
+
+    def heading(msg):
+        return utils.heading(msg + ': ' + heading_info)
+
     heading('Config')
     utils.log_config(config)
     generic_model_dir = config.model_dir

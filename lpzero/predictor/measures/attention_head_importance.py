@@ -19,7 +19,7 @@ def head_importance(model):
                             torch.abs(sublayer.weight.data *
                                       sublayer.weight.grad)
                         )
-    summed = torch.tensor(0.0).to("cuda")
+    summed = torch.tensor(0.0).to('cuda')
     for j in range(len(metric_array)):
         summed += torch.nansum(metric_array[j])
 
@@ -41,7 +41,7 @@ def head_importance_normalized(model):
                             torch.abs(sublayer.weight.data *
                                       sublayer.weight.grad)
                         )
-    summed = torch.tensor(0.0).to("cuda")
+    summed = torch.tensor(0.0).to('cuda')
     for j in range(len(metric_array)):
         summed += torch.nansum(metric_array[j])
     summed /= len(metric_array)

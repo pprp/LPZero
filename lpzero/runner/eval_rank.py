@@ -5,14 +5,14 @@ import numpy as np
 import torch
 from datasets import load_dataset
 from scipy.stats import kendalltau, pearsonr
-from lpzero.predictor.measures import *  # noqa: F403
+from transformers import ElectraTokenizerFast
 
 from lpzero.model.flexibert.modeling_electra import (
     ElectraConfig,
     ElectraLayer,
     ElectraModel,
 )
-from transformers import ElectraTokenizerFast
+from lpzero.predictor.measures import *  # noqa: F403
 
 configs = []
 with open('./data/BERT_benchmark.json', 'r') as f:
@@ -76,7 +76,7 @@ def generate_bert(inputs):
 
         device = torch.device('cuda:0' if torch.cuda.is_available() else 'cpu')
 
-        gt_list = [] 
+        gt_list = []
         baseline_list = []
         sd_list, sdn_list = [], []
         ss_list, ssn_list = [], []
@@ -85,7 +85,6 @@ def generate_bert(inputs):
         hi_list, hin_list = [], []
         hc_list, hcn_list = [], []
         hsc_list, hscn_list = [], []
-        
 
         for i in range(50):
             np.random.seed(0)
@@ -188,30 +187,28 @@ def generate_bert(inputs):
             hcn_list.append(attention_confidence_normalized(head_outputs))
             hsc_list.append(attention_confidence(softmax_outputs))
             hscn_list.append(attention_confidence_normalized(softmax_outputs))
-            
 
             writer.writerow(row)
             f.flush()
 
             print(str(configs[i]['id']))
 
-        # plot for ac, adn 
+        # plot for ac, adn
         import matplotlib.pyplot as plt
         import seaborn as sns
-        sns.set_theme(style="whitegrid")
-        sns.set_context("paper", font_scale=1.5)
+
+        sns.set_theme(style='whitegrid')
+        sns.set_context('paper', font_scale=1.5)
         plt.figure(figsize=(8, 6))
         plt.scatter(adn_list, gt_list, s=10)
-        plt.xlabel("Activation Distance Normalized")
-        plt.ylabel("GLUE Score")
-        plt.savefig("adn.png")
-        
+        plt.xlabel('Activation Distance Normalized')
+        plt.ylabel('GLUE Score')
+        plt.savefig('adn.png')
+
 
 # predict the score of each candidate answer
 
 # calculate the rank consistency
-
-
 
 if __name__ == '__main__':
     inputs = generate_inputs()

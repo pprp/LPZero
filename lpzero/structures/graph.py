@@ -5,16 +5,19 @@ import random
 import torch
 import torch.nn as nn
 
-from emq.dataset.cifar10 import get_cifar10_dataloaders
-from emq.operators import (available_zc_candidates, get_zc_candidates,
-                           sample_unary_key_by_prob, unary_operation)
-from emq.operators.unary_ops import UNARY_KEYS
-from emq.structures.base import BaseStructure
-from emq.structures.utils import convert_to_float
+from lpzero.operators import (
+    available_zc_candidates,
+    get_zc_candidates,
+    sample_unary_key_by_prob,
+    unary_operation,
+)
+from lpzero.operators.unary_ops import UNARY_KEYS
+from lpzero.structures.base import BaseStructure
+from lpzero.structures.utils import convert_to_float
 
 
 class GraphStructure(BaseStructure):
-    """ Graph Structure
+    """Graph Structure
     Build a DAG(Directed Acyclic Graph) structure
     """
 
@@ -36,7 +39,7 @@ class GraphStructure(BaseStructure):
         return available_zc_candidates[idx_zc]
 
     def generate_genotype(self):
-        """ Randomly generate a graph structure."""
+        """Randomly generate a graph structure."""
         zc_name_list = [self.sample_zc_candidates() for _ in range(2)]
         dag = []
         repr_geno = ''
@@ -72,7 +75,8 @@ class GraphStructure(BaseStructure):
                     inputs=img,
                     targets=label,
                     loss_fn=nn.CrossEntropyLoss(),
-                ) for zc_name in self._genotype['input_geno']
+                )
+                for zc_name in self._genotype['input_geno']
             ]
 
             assert len(states) == 2, 'length of states should be 2'
@@ -86,7 +90,8 @@ class GraphStructure(BaseStructure):
         try:
             for edges in self._genotype['op_geno']:
                 assert len(states) == len(
-                    edges), f'length of states should be {len(edges)}'
+                    edges
+                ), f'length of states should be {len(edges)}'
                 # states[i] is list of tensor
                 midst = []
                 for idx, state in zip(edges, states):
@@ -124,9 +129,8 @@ class GraphStructure(BaseStructure):
         """cross over two graph structures and return new genotype"""
         assert isinstance(other, GraphStructure), 'type error'
         # crossover input_geno
-        input_geno = [
-            self._genotype['input_geno'][0], other._genotype['input_geno'][1]
-        ]
+        input_geno = [self._genotype['input_geno']
+                      [0], other._genotype['input_geno'][1]]
 
         # crossover op_geno
         op_geno = []
@@ -158,10 +162,8 @@ class GraphStructure(BaseStructure):
     def mutate_by_genotype(self):
         """return to new genotype"""
         # input_geno
-        input_geno = [
-            self._genotype['input_geno'][0],
-            self.sample_zc_candidates()
-        ]
+        input_geno = [self._genotype['input_geno']
+                      [0], self.sample_zc_candidates()]
 
         # op_geno
         op_geno = []

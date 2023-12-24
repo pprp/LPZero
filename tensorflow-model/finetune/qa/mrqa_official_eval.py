@@ -12,7 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 """Official evaluation script for the MRQA Workshop Shared Task.
-Adapted fromt the SQuAD v1.1 official evaluation script.
+Adapted from the SQuAD v1.1 official evaluation script.
 Modified slightly for the ELECTRA codebase.
 """
 from __future__ import absolute_import, division, print_function

@@ -145,7 +145,9 @@ class TaggingTask(task.Task):
             for token in word_tokens:
                 input_ids.append(self._tokenizer.vocab[token])
 
-        def pad(x): return x + [0] * (self.config.max_seq_length - len(x))
+        def pad(x):
+            return x + [0] * (self.config.max_seq_length - len(x))
+
         labels = pad(example.labels[: self.config.max_seq_length])
         labeled_positions = pad(tagged_positions)
         labels_mask = pad([1.0] * len(tagged_positions))

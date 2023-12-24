@@ -4,13 +4,18 @@ import random
 import torch
 import torch.nn as nn
 
-from emq.operators import (available_zc_candidates, binary_operation,
-                           get_zc_candidates, sample_binary_key_by_prob,
-                           sample_unary_key_by_prob, unary_operation)
-from emq.operators.binary_ops import BINARY_KEYS
-from emq.operators.unary_ops import UNARY_KEYS
-from emq.structures.base import BaseStructure
-from emq.structures.utils import convert_to_float
+from lpzero.operators import (
+    available_zc_candidates,
+    binary_operation,
+    get_zc_candidates,
+    sample_binary_key_by_prob,
+    sample_unary_key_by_prob,
+    unary_operation,
+)
+from lpzero.operators.binary_ops import BINARY_KEYS
+from lpzero.operators.unary_ops import UNARY_KEYS
+from lpzero.structures.base import BaseStructure
+from lpzero.structures.utils import convert_to_float
 
 
 class TreeStructure(BaseStructure):
@@ -36,7 +41,7 @@ class TreeStructure(BaseStructure):
         return available_zc_candidates[idx_zc]
 
     def generate_genotype(self):
-        """ Randomly generate a tree structure.
+        """Randomly generate a tree structure.
 
         For geno:
             input1: [op1, op2]
@@ -99,29 +104,25 @@ class TreeStructure(BaseStructure):
             # process input1 with two unary operations
             A1 = [a * b for a, b in zip(A1, bit_cfg)]
 
-            A1 = [
-                unary_operation(a, self._genotype['op_geno'][0][0]) for a in A1
-            ]
-            A1 = [
-                unary_operation(a, self._genotype['op_geno'][0][1]) for a in A1
-            ]
+            A1 = [unary_operation(a, self._genotype['op_geno'][0][0])
+                  for a in A1]
+            A1 = [unary_operation(a, self._genotype['op_geno'][0][1])
+                  for a in A1]
 
             # process input2 with two unary operations
             A2 = [a * b for a, b in zip(A2, bit_cfg)]
-            A2 = [
-                unary_operation(a, self._genotype['op_geno'][1][0]) for a in A2
-            ]
-            A2 = [
-                unary_operation(a, self._genotype['op_geno'][1][1]) for a in A2
-            ]
+            A2 = [unary_operation(a, self._genotype['op_geno'][1][0])
+                  for a in A2]
+            A2 = [unary_operation(a, self._genotype['op_geno'][1][1])
+                  for a in A2]
 
             # process binary operation
             A = []
             for a1, a2 in zip(A1, A2):
                 a1 = convert_to_float(a1)
                 a2 = convert_to_float(a2)
-                A.append(
-                    binary_operation(a1, a2, self._genotype['op_geno'][2]))
+                A.append(binary_operation(
+                    a1, a2, self._genotype['op_geno'][2]))
 
         except Exception as e:
             print('GOT ERROR in TREE STRUCTURE:', e)
@@ -163,29 +164,25 @@ class TreeStructure(BaseStructure):
 
             A1 = [a * b for a, b in zip(A1, struct_list)]
 
-            A1 = [
-                unary_operation(a, self._genotype['op_geno'][0][0]) for a in A1
-            ]
-            A1 = [
-                unary_operation(a, self._genotype['op_geno'][0][1]) for a in A1
-            ]
+            A1 = [unary_operation(a, self._genotype['op_geno'][0][0])
+                  for a in A1]
+            A1 = [unary_operation(a, self._genotype['op_geno'][0][1])
+                  for a in A1]
 
             # process input2 with two unary operations
             A2 = [a * b for a, b in zip(A2, struct_list)]
-            A2 = [
-                unary_operation(a, self._genotype['op_geno'][1][0]) for a in A2
-            ]
-            A2 = [
-                unary_operation(a, self._genotype['op_geno'][1][1]) for a in A2
-            ]
+            A2 = [unary_operation(a, self._genotype['op_geno'][1][0])
+                  for a in A2]
+            A2 = [unary_operation(a, self._genotype['op_geno'][1][1])
+                  for a in A2]
 
             # process binary operation
             A = []
             for a1, a2 in zip(A1, A2):
                 a1 = convert_to_float(a1)
                 a2 = convert_to_float(a2)
-                A.append(
-                    binary_operation(a1, a2, self._genotype['op_geno'][2]))
+                A.append(binary_operation(
+                    a1, a2, self._genotype['op_geno'][2]))
 
         except Exception as e:
             print('GOT ERROR in TREE STRUCTURE:', e)
@@ -222,29 +219,25 @@ class TreeStructure(BaseStructure):
             # process input1 with two unary operations
             A1 = [a * b for a, b in zip(A1, bit_cfg)]
 
-            A1 = [
-                unary_operation(a, self._genotype['op_geno'][0][0]) for a in A1
-            ]
-            A1 = [
-                unary_operation(a, self._genotype['op_geno'][0][1]) for a in A1
-            ]
+            A1 = [unary_operation(a, self._genotype['op_geno'][0][0])
+                  for a in A1]
+            A1 = [unary_operation(a, self._genotype['op_geno'][0][1])
+                  for a in A1]
 
             # process input2 with two unary operations
             A2 = [a * b for a, b in zip(A2, bit_cfg)]
-            A2 = [
-                unary_operation(a, self._genotype['op_geno'][1][0]) for a in A2
-            ]
-            A2 = [
-                unary_operation(a, self._genotype['op_geno'][1][1]) for a in A2
-            ]
+            A2 = [unary_operation(a, self._genotype['op_geno'][1][0])
+                  for a in A2]
+            A2 = [unary_operation(a, self._genotype['op_geno'][1][1])
+                  for a in A2]
 
             # process binary operation
             A = []
             for a1, a2 in zip(A1, A2):
                 a1 = convert_to_float(a1)
                 a2 = convert_to_float(a2)
-                A.append(
-                    binary_operation(a1, a2, self._genotype['op_geno'][2]))
+                A.append(binary_operation(
+                    a1, a2, self._genotype['op_geno'][2]))
 
         except Exception as e:
             print('GOT ERROR in TREE STRUCTURE:', e)
@@ -253,8 +246,7 @@ class TreeStructure(BaseStructure):
         return A
 
     def __call__(self, img, label, model, bit_cfg: list, return_all=False):
-        return self.forward_tree(
-            img, label, model, bit_cfg, return_all=return_all)
+        return self.forward_tree(img, label, model, bit_cfg, return_all=return_all)
 
     def cross_over_by_genotype(self, other):
         """Cross over two tree structure and return new one"""

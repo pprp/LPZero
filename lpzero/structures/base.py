@@ -2,7 +2,6 @@ from abc import ABCMeta, abstractmethod
 
 
 class BaseStructure(metaclass=ABCMeta):
-
     def __init__(self, *args, **kwargs):
         super().__init__()
         self._genotype = None
@@ -30,10 +29,10 @@ class BaseStructure(metaclass=ABCMeta):
 
     @abstractmethod
     def cross_over_by_genotype(self, other):
-        """ Cross over two tree structure and return new one """
+        """Cross over two tree structure and return new one"""
         pass
 
     @abstractmethod
     def mutate_by_genotype(self):
-        """ Mutate the genotype of the structure """
+        """Mutate the genotype of the structure"""
         pass

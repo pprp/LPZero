@@ -10,12 +10,28 @@ Matrix = TypeVar('Matrix')
 
 ALLTYPE = Union[Union[Scalar, Vector], Matrix]
 
-UNARY_KEYS = ('element_wise_log', 'element_wise_abslog', 'element_wise_abs',
-              'element_wise_pow', 'element_wise_exp', 'normalize',
-              'element_wise_relu', 'element_wise_invert', 'frobenius_norm',
-              'element_wise_normalized_sum', 'l1_norm', 'softmax', 'sigmoid',
-              'logsoftmax', 'element_wise_sqrt', 'element_wise_revert',
-              'min_max_normalize', 'to_mean_scalar', 'to_std_scalar', 'no_op')
+UNARY_KEYS = (
+    'element_wise_log',
+    'element_wise_abslog',
+    'element_wise_abs',
+    'element_wise_pow',
+    'element_wise_exp',
+    'normalize',
+    'element_wise_relu',
+    'element_wise_invert',
+    'frobenius_norm',
+    'element_wise_normalized_sum',
+    'l1_norm',
+    'softmax',
+    'sigmoid',
+    'logsoftmax',
+    'element_wise_sqrt',
+    'element_wise_revert',
+    'min_max_normalize',
+    'to_mean_scalar',
+    'to_std_scalar',
+    'no_op',
+)
 SCALAR_KEYS = ('to_mean_scalar', 'to_std_scalar')
 
 # remove `gram_matrix` for now to avoid OOM
@@ -30,8 +46,7 @@ def sample_unary_key_by_prob(probability=None):
     if probability is None:
         # other than the last one, the rest are the same small
         probability = [0.1] * (len(UNARY_KEYS) - 1) + [0.2]
-    return random.choices(
-        list(range(len(UNARY_KEYS))), weights=probability, k=1)[0]
+    return random.choices(list(range(len(UNARY_KEYS))), weights=probability, k=1)[0]
 
 
 # unary operation
@@ -175,8 +190,7 @@ def to_sqrt_scalar(A: ALLTYPE) -> Scalar:
 
 
 def gram_matrix(A: Matrix) -> Matrix:
-    """https://pytorch.org/tutorials/advanced/neural_style_tutorial.html
-    """
+    """https://pytorch.org/tutorials/advanced/neural_style_tutorial.html"""
     assert len(A.shape) == 4, 'Input shape is invalid.'
     a, b, c, d = A.size()
     feature = A.view(a * b, c * d)

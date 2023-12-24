@@ -7,7 +7,7 @@ def attention_confidence(outputs):
     for output in outputs:
         metric_array.append(torch.mean(torch.max(output, 1)[0]))
 
-    summed = torch.tensor(0.0).to("cuda")
+    summed = torch.tensor(0.0).to('cuda')
     for j in range(len(outputs)):
         summed += torch.nansum(metric_array[j])
 
@@ -19,7 +19,7 @@ def attention_confidence_normalized(outputs):
     for output in outputs:
         metric_array.append(torch.mean(torch.max(output, 1)[0]))
 
-    summed = torch.tensor(0.0).to("cuda")
+    summed = torch.tensor(0.0).to('cuda')
     for j in range(len(metric_array)):
         summed += torch.nansum(metric_array[j])
     summed /= len(metric_array)

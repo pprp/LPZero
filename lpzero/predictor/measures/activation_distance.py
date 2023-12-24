@@ -11,7 +11,7 @@ def activation_distance(outputs):
         K2 = (1.0 - x) @ (1.0 - x.t())
         metric_array.append(K + K2)
 
-    summed = torch.tensor(0.0).to("cuda")
+    summed = torch.tensor(0.0).to('cuda')
     for j in range(len(outputs)):
         summed += torch.nansum(metric_array[j])
 
@@ -26,10 +26,10 @@ def activation_distance_normalized(outputs):
         K = x @ x.t()
         K2 = (1.0 - x) @ (1.0 - x.t())
         metric_array.append(K + K2)
-        
-    summed = torch.tensor(0.0).to("cuda")
+
+    summed = torch.tensor(0.0).to('cuda')
     for j in range(len(outputs)):
         summed += torch.nansum(metric_array[j])
     summed /= len(metric_array)
-    
+
     return summed.detach().item()

@@ -3,16 +3,19 @@ import random
 import torch
 import torch.nn as nn
 
-from emq.dataset.cifar10 import get_cifar10_dataloaders
-from emq.operators import (available_zc_candidates, get_zc_candidates,
-                           sample_unary_key_by_prob, unary_operation)
-from emq.operators.unary_ops import UNARY_KEYS
-from emq.structures.base import BaseStructure
-from emq.structures.utils import convert_to_float
+from lpzero.operators import (
+    available_zc_candidates,
+    get_zc_candidates,
+    sample_unary_key_by_prob,
+    unary_operation,
+)
+from lpzero.operators.unary_ops import UNARY_KEYS
+from lpzero.structures.base import BaseStructure
+from lpzero.structures.utils import convert_to_float
 
 
 class LinearStructure(BaseStructure):
-    """ Linear Structure
+    """Linear Structure
     Randomly sample one input, and sample `length` unary operations
     to form a linear structure.
     """
@@ -37,7 +40,7 @@ class LinearStructure(BaseStructure):
         return available_zc_candidates[idx_zc]
 
     def generate_genotype(self) -> dict:
-        """ Randomly generate a linear structure."""
+        """Randomly generate a linear structure."""
         zc_name = self.sample_zc_candidates()
         repr_geno = ''
         repr_geno += f'INPUT:({zc_name})'
@@ -77,9 +80,8 @@ class LinearStructure(BaseStructure):
                 assert isinstance(A, (list, tuple))
                 if len(A) == -1:
                     return -1
-                A = [
-                    unary_operation(a, self._genotype['op_geno'][i]) for a in A
-                ]
+                A = [unary_operation(a, self._genotype['op_geno'][i])
+                     for a in A]
 
         except Exception as e:
             print('GOT ERROR in LINEAR STRUCTURE: ', e)

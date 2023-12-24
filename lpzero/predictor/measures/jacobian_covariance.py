@@ -2,6 +2,7 @@ import numpy as np
 import torch
 from sklearn.metrics import pairwise_distances
 
+
 # Covariance calculations for Jacobian covariance and variations
 def covariance(jacobs):
     jacob = torch.transpose(jacobs, 0, 1).reshape(
@@ -14,10 +15,11 @@ def covariance(jacobs):
 
 # Cosine calculations for Jacobian cosine and variations
 def cosine(jacobs):
-    jacob = torch.transpose(jacobs, 0, 1).reshape(jacobs.size(1), -1).cpu().numpy()
+    jacob = torch.transpose(jacobs, 0, 1).reshape(
+        jacobs.size(1), -1).cpu().numpy()
     norm = np.linalg.norm(jacob, axis=1)
     normed = jacob / norm[:, None]
-    cosines = (-pairwise_distances(normed, metric="cosine") + 1) - np.identity(
+    cosines = (-pairwise_distances(normed, metric='cosine') + 1) - np.identity(
         normed.shape[0]
     )
     summed = np.sum(np.power(np.absolute(cosines.flatten()), 1.0 / 20)) / 2

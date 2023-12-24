@@ -1,7 +1,7 @@
 import numpy as np
 import torch
 
-from emq.operators.unary_ops import to_mean_scalar
+from lpzero.operators.unary_ops import to_mean_scalar
 
 
 def convert_to_float(input):

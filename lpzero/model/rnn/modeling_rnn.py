@@ -1,14 +1,14 @@
-from weight_drop import ParameterListWeightDrop, WeightDrop
-from locked_dropout import LockedDropout
-from embed_regularize import embedded_dropout
-import numpy as np
 import json
 import math
 
 import networkx as nx
+import numpy as np
 import torch
 import torch.nn
+from embed_regularize import embedded_dropout
+from locked_dropout import LockedDropout
 from multilinear import MultiLinear
+from weight_drop import ParameterListWeightDrop, WeightDrop
 
 
 # From NAS-Bench-NLP https://github.com/fmsnew/nas-bench-nlp-release
