@@ -1,4 +1,5 @@
 import torch 
+from lpzero.model.flexibert.modeling_electra import ElectraLayer
 
 # Attention Head Importance metric
 def head_importance(model):

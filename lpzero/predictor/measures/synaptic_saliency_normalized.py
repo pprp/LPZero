@@ -1,5 +1,5 @@
 import torch 
-
+from lpzero.model.flexibert.modeling_electra import ElectraLayer
 
 def synaptic_saliency_normalized(model):
     metric_array = []
