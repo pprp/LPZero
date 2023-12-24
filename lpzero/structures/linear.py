@@ -58,7 +58,7 @@ class LinearStructure(BaseStructure):
         self._genotype['op_geno'] = op_geno
         self._repr_geno = repr_geno
 
-    def forward_linear(self, img, label, model, bit_cfg: list):
+    def forward_linear(self, inputs, model):
         """forward to get zc scores"""
         if torch.cuda.is_available():
             img = img.cuda()
@@ -75,7 +75,6 @@ class LinearStructure(BaseStructure):
                 loss_fn=nn.CrossEntropyLoss(),
             )
 
-            A = [a * b for a, b in zip(A, bit_cfg)]
             for i in range(len(self._genotype['op_geno'])):
                 assert isinstance(A, (list, tuple))
                 if len(A) == -1:
@@ -88,8 +87,8 @@ class LinearStructure(BaseStructure):
             return -1
         return convert_to_float(A)
 
-    def __call__(self, img, label, model, bit_cfg):
-        return self.forward_linear(img, label, model, bit_cfg)
+    def __call__(self, inputs, model):
+        return self.forward_linear(inputs, model)
 
     def cross_over_by_genotype(self, other):
         """Cross over two genotypes and return new one"""

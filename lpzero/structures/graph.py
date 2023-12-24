@@ -60,7 +60,7 @@ class GraphStructure(BaseStructure):
         self._genotype['op_geno'] = dag
         self._repr_geno = repr_geno
 
-    def forward_dag(self, img, label, model, bit_cfg: list):
+    def forward_dag(self, inputs, model):
         if torch.cuda.is_available():
             img = img.cuda()
             label = label.cuda()
@@ -80,8 +80,6 @@ class GraphStructure(BaseStructure):
             ]
 
             assert len(states) == 2, 'length of states should be 2'
-            states = [[a * b for a, b in zip(state, bit_cfg)]
-                      for state in states]
 
         except Exception as e:
             print('GOT ERROR in GRAPH STRUCTURE: ', e)
@@ -122,8 +120,8 @@ class GraphStructure(BaseStructure):
         # check whether the res_list of float have inf,nan
         return sum(res_list) / len(res_list)
 
-    def __call__(self, img, label, model, bit_cfg: list):
-        return self.forward_dag(img, label, model, bit_cfg)
+    def __call__(self, inputs, model):
+        return self.forward_dag(inputs, model)
 
     def cross_over_by_genotype(self, other):
         """cross over two graph structures and return new genotype"""

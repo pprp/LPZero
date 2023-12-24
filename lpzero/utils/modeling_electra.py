@@ -24,7 +24,6 @@ from typing import List, Optional, Tuple, Union
 import numpy as np
 import torch
 import torch.utils.checkpoint
-from configuration_electra import ElectraConfig
 from packaging import version
 from torch import nn
 from torch.nn import BCEWithLogitsLoss, CrossEntropyLoss, MSELoss
@@ -32,17 +31,29 @@ from transformers.activations import ACT2FN, get_activation
 from transformers.modeling_outputs import (
     BaseModelOutputWithCrossAttentions,
     BaseModelOutputWithPastAndCrossAttentions,
-    CausalLMOutputWithCrossAttentions, MaskedLMOutput,
-    MultipleChoiceModelOutput, QuestionAnsweringModelOutput,
-    SequenceClassifierOutput, TokenClassifierOutput)
+    CausalLMOutputWithCrossAttentions,
+    MaskedLMOutput,
+    MultipleChoiceModelOutput,
+    QuestionAnsweringModelOutput,
+    SequenceClassifierOutput,
+    TokenClassifierOutput,
+)
 from transformers.modeling_utils import PreTrainedModel, SequenceSummary
-from transformers.pytorch_utils import (apply_chunking_to_forward,
-                                        find_pruneable_heads_and_indices,
-                                        prune_linear_layer)
-from transformers.utils import (ModelOutput, add_code_sample_docstrings,
-                                add_start_docstrings,
-                                add_start_docstrings_to_model_forward, logging,
-                                rlpzero.model.configuration_electrangs)
+from transformers.pytorch_utils import (
+    apply_chunking_to_forward,
+    find_pruneable_heads_and_indices,
+    prune_linear_layer,
+)
+from transformers.utils import (
+    ModelOutput,
+    add_code_sample_docstrings,
+    add_start_docstrings,
+    add_start_docstrings_to_model_forward,
+    logging,
+    replace_return_docstrings,
+)
+
+from lpzero.model.configuration_electra import ElectraConfig
 
 logger = logging.get_logger(__name__)
 

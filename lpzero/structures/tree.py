@@ -75,10 +75,9 @@ class TreeStructure(BaseStructure):
         self._genotype['op_geno'] = geno
         self._repr_geno = repr_geno
 
-    def forward_tree(self, img, label, model, bit_cfg: list, return_all=False):
+    def forward_tree(self, inputs, model, return_all=False):
         if torch.cuda.is_available():
-            img = img.cuda()
-            label = label.cuda()
+            inputs=inputs.cuda()
         try:
             # if True:
             A1, A2 = self._genotype['input_geno']
@@ -87,8 +86,7 @@ class TreeStructure(BaseStructure):
                 model,
                 device=torch.device(
                     'cuda' if torch.cuda.is_available() else 'cpu'),
-                inputs=img,
-                targets=label,
+                inputs=inputs,
                 loss_fn=nn.CrossEntropyLoss(),
             )
             A2 = get_zc_candidates(
@@ -96,21 +94,17 @@ class TreeStructure(BaseStructure):
                 model,
                 device=torch.device(
                     'cuda' if torch.cuda.is_available() else 'cpu'),
-                inputs=img,
-                targets=label,
+                inputs=inputs,
                 loss_fn=nn.CrossEntropyLoss(),
             )
 
             # process input1 with two unary operations
-            A1 = [a * b for a, b in zip(A1, bit_cfg)]
-
             A1 = [unary_operation(a, self._genotype['op_geno'][0][0])
                   for a in A1]
             A1 = [unary_operation(a, self._genotype['op_geno'][0][1])
                   for a in A1]
 
             # process input2 with two unary operations
-            A2 = [a * b for a, b in zip(A2, bit_cfg)]
             A2 = [unary_operation(a, self._genotype['op_geno'][1][0])
                   for a in A2]
             A2 = [unary_operation(a, self._genotype['op_geno'][1][1])
@@ -133,10 +127,9 @@ class TreeStructure(BaseStructure):
         else:
             return convert_to_float(A)
 
-    def forward_structure(self, img, label, model, structure_info: list):
+    def forward_structure(self, inputs, model, structure_info: list):
         if torch.cuda.is_available():
-            img = img.cuda()
-            label = label.cuda()
+            inputs=inputs.cuda()
         # if True:
         try:
             A1, A2 = self._genotype['input_geno']
@@ -145,8 +138,7 @@ class TreeStructure(BaseStructure):
                 model,
                 device=torch.device(
                     'cuda' if torch.cuda.is_available() else 'cpu'),
-                inputs=img,
-                targets=label,
+                inputs=inputs,
                 loss_fn=nn.CrossEntropyLoss(),
             )
             A2 = get_zc_candidates(
@@ -154,8 +146,7 @@ class TreeStructure(BaseStructure):
                 model,
                 device=torch.device(
                     'cuda' if torch.cuda.is_available() else 'cpu'),
-                inputs=img,
-                targets=label,
+                inputs=inputs,
                 loss_fn=nn.CrossEntropyLoss(),
             )
 
@@ -190,20 +181,17 @@ class TreeStructure(BaseStructure):
 
         return convert_to_float(A)
 
-    def forward_save(self, img, label, model, bit_cfg: list):
+    def forward_save(self, inputs, model):
         if torch.cuda.is_available():
-            img = img.cuda()
-            label = label.cuda()
+            inputs = inputs.cuda()
         try:
-            # if True:
             A1, A2 = self._genotype['input_geno']
             A1 = get_zc_candidates(
                 self._genotype['input_geno'][0],
                 model,
                 device=torch.device(
                     'cuda' if torch.cuda.is_available() else 'cpu'),
-                inputs=img,
-                targets=label,
+                inputs=inputs,
                 loss_fn=nn.CrossEntropyLoss(),
             )
             A2 = get_zc_candidates(
@@ -211,21 +199,17 @@ class TreeStructure(BaseStructure):
                 model,
                 device=torch.device(
                     'cuda' if torch.cuda.is_available() else 'cpu'),
-                inputs=img,
-                targets=label,
+                inputs=inputs,
                 loss_fn=nn.CrossEntropyLoss(),
             )
 
             # process input1 with two unary operations
-            A1 = [a * b for a, b in zip(A1, bit_cfg)]
-
             A1 = [unary_operation(a, self._genotype['op_geno'][0][0])
                   for a in A1]
             A1 = [unary_operation(a, self._genotype['op_geno'][0][1])
                   for a in A1]
 
             # process input2 with two unary operations
-            A2 = [a * b for a, b in zip(A2, bit_cfg)]
             A2 = [unary_operation(a, self._genotype['op_geno'][1][0])
                   for a in A2]
             A2 = [unary_operation(a, self._genotype['op_geno'][1][1])
@@ -245,8 +229,8 @@ class TreeStructure(BaseStructure):
 
         return A
 
-    def __call__(self, img, label, model, bit_cfg: list, return_all=False):
-        return self.forward_tree(img, label, model, bit_cfg, return_all=return_all)
+    def __call__(self, inputs, model, return_all=False):
+        return self.forward_tree(inputs, model, return_all=return_all)
 
     def cross_over_by_genotype(self, other):
         """Cross over two tree structure and return new one"""

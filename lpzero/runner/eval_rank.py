@@ -86,7 +86,7 @@ def generate_bert(inputs):
         hc_list, hcn_list = [], []
         hsc_list, hscn_list = [], []
 
-        for i in range(50):
+        for i in range(500):
             np.random.seed(0)
             torch.manual_seed(0)
 
