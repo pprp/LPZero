@@ -19,8 +19,8 @@ import argparse
 import torch
 from transformers.utils import logging
 
-from configuration_electra import ElectraConfig
-from modeling_electra import (
+from lpzero.model.configuration_electra import ElectraConfig
+from lpzero.utils.modeling_electra import (
     ElectraForMaskedLM,
     ElectraForPreTraining,
     load_tf_weights_in_electra,

@@ -53,7 +53,7 @@ from transformers.utils import (
     replace_return_docstrings,
 )
 
-from configuration_electra import ElectraConfig
+from lpzero.model.configuration_electra import ElectraConfig
 
 logger = logging.get_logger(__name__)
 

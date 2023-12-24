@@ -50,7 +50,7 @@ from transformers.utils import (
     add_start_docstrings,
     add_start_docstrings_to_model_forward,
     logging,
-    replace_return_docstrings,
+    rlpzero.model.configuration_electrangs,
 )
 
 from configuration_electra import ElectraConfig
