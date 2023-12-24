@@ -11,11 +11,11 @@ from lpzero.model.flexibert.modeling_electra import (
     ElectraConfig,
     ElectraLayer,
     ElectraModel,
-    ElectraTokenizerFast,
 )
+from transformers import ElectraTokenizerFast
 
 configs = []
-with open('./nas_configs.json', 'r') as f:
+with open('./data/BERT_benchmark.json', 'r') as f:
     configs = json.load(f)
 
 
@@ -49,7 +49,7 @@ def generate_inputs():
 # generate model BERT
 def generate_bert(inputs):
     # Run metrics on all model in benchmark
-    with open('BERT_initialization_ablation.csv', 'a') as f:
+    with open('./BERT_results_activation.csv', 'a') as f:
         writer = csv.writer(f)
 
         header = [
@@ -76,7 +76,18 @@ def generate_bert(inputs):
 
         device = torch.device('cuda:0' if torch.cuda.is_available() else 'cpu')
 
-        for i in range(500):
+        gt_list = [] 
+        baseline_list = []
+        sd_list, sdn_list = [], []
+        ss_list, ssn_list = [], []
+        ad_list, adn_list = [], []
+        js_list, jsn_list = [], []
+        hi_list, hin_list = [], []
+        hc_list, hcn_list = [], []
+        hsc_list, hscn_list = [], []
+        
+
+        for i in range(50):
             np.random.seed(0)
             torch.manual_seed(0)
 
@@ -161,11 +172,40 @@ def generate_bert(inputs):
                 attention_confidence_normalized(softmax_outputs),
             ]
 
+            gt_list.append(configs[i]['scores']['glue'])
+            baseline_list.append(configs[0]['scores']['glue'])
+            sd_list.append(synaptic_diversity(model))
+            sdn_list.append(synaptic_diversity_normalized(model))
+            ss_list.append(synaptic_saliency(model))
+            ssn_list.append(synaptic_saliency_normalized(model))
+            ad_list.append(activation_distance(activation_outputs))
+            adn_list.append(activation_distance_normalized(activation_outputs))
+            js_list.append(jacobian_score(model))
+            jsn_list.append(jacobian_score_cosine(model))
+            hi_list.append(head_importance(model))
+            hin_list.append(head_importance_normalized(model))
+            hc_list.append(attention_confidence(head_outputs))
+            hcn_list.append(attention_confidence_normalized(head_outputs))
+            hsc_list.append(attention_confidence(softmax_outputs))
+            hscn_list.append(attention_confidence_normalized(softmax_outputs))
+            
+
             writer.writerow(row)
             f.flush()
 
             print(str(configs[i]['id']))
 
+        # plot for ac, adn 
+        import matplotlib.pyplot as plt
+        import seaborn as sns
+        sns.set_theme(style="whitegrid")
+        sns.set_context("paper", font_scale=1.5)
+        plt.figure(figsize=(8, 6))
+        plt.scatter(adn_list, gt_list, s=10)
+        plt.xlabel("Activation Distance Normalized")
+        plt.ylabel("GLUE Score")
+        plt.savefig("adn.png")
+        
 
 # predict the score of each candidate answer
 
