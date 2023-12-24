@@ -1,3 +1,8 @@
+from weight_drop import ParameterListWeightDrop, WeightDrop
+from locked_dropout import LockedDropout
+from embed_regularize import embedded_dropout
+import numpy as np
+import json
 import math
 
 import networkx as nx
@@ -5,17 +10,18 @@ import torch
 import torch.nn
 from multilinear import MultiLinear
 
+
 # From NAS-Bench-NLP https://github.com/fmsnew/nas-bench-nlp-release
 class CustomRNNCell(torch.nn.Module):
-    elementwise_ops_dict = {"prod": torch.mul, "sum": torch.add}
+    elementwise_ops_dict = {'prod': torch.mul, 'sum': torch.add}
 
     def __init__(self, input_size, hidden_size, recepie):
         super(CustomRNNCell, self).__init__()
 
         self.activations_dict = {
-            "tanh": torch.nn.Tanh(),
-            "sigm": torch.nn.Sigmoid(),
-            "leaky_relu": torch.nn.LeakyReLU(),
+            'tanh': torch.nn.Tanh(),
+            'sigm': torch.nn.Sigmoid(),
+            'leaky_relu': torch.nn.LeakyReLU(),
         }
 
         self.input_size = input_size
@@ -28,12 +34,11 @@ class CustomRNNCell(torch.nn.Module):
         self.G = nx.DiGraph()
         for k in recepie.keys():
             if k not in components_dict:
-
                 component = self._make_component(recepie[k])
                 if component is not None:
                     components_dict[k] = component
-                if k.startswith("h_new"):
-                    suffix = k.replace("h_new_", "")
+                if k.startswith('h_new'):
+                    suffix = k.replace('h_new_', '')
                     if suffix.isdigit():
                         self.hidden_tuple_size = max(
                             [self.hidden_tuple_size, int(suffix) + 1]
@@ -41,7 +46,7 @@ class CustomRNNCell(torch.nn.Module):
 
                 if k not in self.G.nodes():
                     self.G.add_node(k)
-                for i, n in enumerate(recepie[k]["input"]):
+                for i, n in enumerate(recepie[k]['input']):
                     if n not in self.G.nodes():
                         self.G.add_node(k)
                     self.G.add_edge(n, k)
@@ -56,44 +61,49 @@ class CustomRNNCell(torch.nn.Module):
         hidden_tuple[0].retain_grad()
         hidden_states.append(hidden_tuple[0])
         for n in self.nodes_order:
-            if n == "x":
-                calculated_nodes["x"] = x.unsqueeze(0)
-            elif n.startswith("h_prev") and n.replace("h_prev_", "").isdigit():
+            if n == 'x':
+                calculated_nodes['x'] = x.unsqueeze(0)
+            elif n.startswith('h_prev') and n.replace('h_prev_', '').isdigit():
                 calculated_nodes[n] = hidden_tuple[
-                    int(n.replace("h_prev_", ""))
+                    int(n.replace('h_prev_', ''))
                 ].unsqueeze(0)
             elif n in self.components:
-                inputs = [calculated_nodes[k] for k in self.recepie[n]["input"]]
+                inputs = [calculated_nodes[k]
+                          for k in self.recepie[n]['input']]
                 calculated_nodes[n] = self.components[n](*inputs)
             else:
                 # simple operations
-                op = self.recepie[n]["op"]
-                inputs = [calculated_nodes[k] for k in self.recepie[n]["input"]]
-                if op in ["elementwise_prod", "elementwise_sum"]:
+                op = self.recepie[n]['op']
+                inputs = [calculated_nodes[k]
+                          for k in self.recepie[n]['input']]
+                if op in ['elementwise_prod', 'elementwise_sum']:
                     op_func = CustomRNNCell.elementwise_ops_dict[
-                        op.replace("elementwise_", "")
+                        op.replace('elementwise_', '')
                     ]
                     calculated_nodes[n] = op_func(inputs[0], inputs[1])
                     for inp in range(2, len(inputs)):
-                        calculated_nodes[n] = op_func(calculated_nodes[n], inputs[i])
-                elif op == "blend":
+                        calculated_nodes[n] = op_func(
+                            calculated_nodes[n], inputs[i])
+                elif op == 'blend':
                     calculated_nodes[n] = (
                         inputs[0] * inputs[1] + (1 - inputs[0]) * inputs[2]
                     )
-                elif op.startswith("activation"):
-                    op_func = self.activations_dict[op.replace("activation_", "")]
+                elif op.startswith('activation'):
+                    op_func = self.activations_dict[op.replace(
+                        'activation_', '')]
                     calculated_nodes[n] = op_func(inputs[0])
                     # calculate and store K codes for activations in RNN - LeakyReLU, TanH, Sigmoid
                     calculate_activations(calculated_nodes[n])
         return tuple(
-            [calculated_nodes[f"h_new_{i}"][0] for i in range(self.hidden_tuple_size)]
+            [calculated_nodes[f'h_new_{i}'][0]
+                for i in range(self.hidden_tuple_size)]
         )
 
     def _make_component(self, spec):
-        if spec["op"] == "linear":
+        if spec['op'] == 'linear':
             input_sizes = [
-                self.input_size if inp == "x" else self.hidden_size
-                for inp in spec["input"]
+                self.input_size if inp == 'x' else self.hidden_size
+                for inp in spec['input']
             ]
             return MultiLinear(input_sizes, self.hidden_size)
 
@@ -140,20 +150,12 @@ class CustomRNN(torch.nn.Module):
 
     def check_hidden_size(self, hidden_tuple, batch_size):
         expected_hidden_size = (1, batch_size, self.hidden_size)
-        msg = "Expected hidden size {}, got {}"
+        msg = 'Expected hidden size {}, got {}'
         for hx in hidden_tuple:
             if hx.size() != expected_hidden_size:
-                raise RuntimeError(msg.format(expected_hidden_size, tuple(hx.size())))
-            
+                raise RuntimeError(msg.format(
+                    expected_hidden_size, tuple(hx.size())))
 
-import json
-
-import numpy as np
-import torch
-import torch.nn
-from embed_regularize import embedded_dropout
-from locked_dropout import LockedDropout
-from weight_drop import ParameterListWeightDrop, WeightDrop
 
 # From NAS-Bench-NLP https://github.com/fmsnew/nas-bench-nlp-release
 class AWDRNNModel(torch.nn.Module):
@@ -192,29 +194,30 @@ class AWDRNNModel(torch.nn.Module):
         self.rnns = []
         for i in range(nlayers):
             input_size = ninp if i == 0 else nhid
-            hidden_size = nhid if i != nlayers - 1 else (ninp if tie_weights else nhid)
-            if rnn_type == "LSTM":
+            hidden_size = nhid if i != nlayers - \
+                1 else (ninp if tie_weights else nhid)
+            if rnn_type == 'LSTM':
                 self.rnns.append(torch.nn.LSTM(input_size, hidden_size))
-            elif rnn_type == "CustomRNN":
+            elif rnn_type == 'CustomRNN':
                 self.rnns.append(CustomRNN(input_size, hidden_size, recepie))
 
         if wdrop:
-            if rnn_type == "LSTM":
+            if rnn_type == 'LSTM':
                 self.rnns = [
-                    WeightDrop(rnn, ["weight_hh_l0"], dropout=wdrop)
+                    WeightDrop(rnn, ['weight_hh_l0'], dropout=wdrop)
                     for rnn in self.rnns
                 ]
-            elif rnn_type == "CustomRNN":
+            elif rnn_type == 'CustomRNN':
                 wd_rnns = []
                 for rnn in self.rnns:
                     multilinear_components = []
                     for k, v in rnn.cell.components.items():
-                        if rnn.cell.recepie[k]["op"] == "linear":
+                        if rnn.cell.recepie[k]['op'] == 'linear':
                             for i in np.where(
-                                np.array(rnn.cell.recepie[k]["input"]) != "x"
+                                np.array(rnn.cell.recepie[k]['input']) != 'x'
                             )[0]:
                                 multilinear_components.append(
-                                    f"cell.components.{k}.weights.{i}"
+                                    f'cell.components.{k}.weights.{i}'
                                 )
                     wd_rnns.append(
                         ParameterListWeightDrop(
@@ -254,7 +257,6 @@ class AWDRNNModel(torch.nn.Module):
         self.decoder.weight.data.uniform_(-initrange, initrange)
 
     def forward(self, input, hidden, return_h=False, skip_embedding=False):
-
         emb = (
             input
             if skip_embedding
@@ -294,9 +296,9 @@ class AWDRNNModel(torch.nn.Module):
         weight = next(self.parameters()).data
         hidden = []
         for i in range(self.nlayers):
-            if self.rnn_type == "LSTM":
+            if self.rnn_type == 'LSTM':
                 hidden_tuple_size = 2
-            elif self.rnn_type == "CustomRNN":
+            elif self.rnn_type == 'CustomRNN':
                 if self.wdrop:
                     # wrapped with ParameterListWeightDrop
                     hidden_tuple_size = self.rnns[0].module.cell.hidden_tuple_size

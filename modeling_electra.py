@@ -15,20 +15,18 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from json import encoder
 import math
 import os
 from dataclasses import dataclass
+from json import encoder
 from typing import List, Optional, Tuple, Union
 
 import numpy as np
-
 import torch
 import torch.utils.checkpoint
 from packaging import version
 from torch import nn
 from torch.nn import BCEWithLogitsLoss, CrossEntropyLoss, MSELoss
-
 from transformers.activations import ACT2FN, get_activation
 from transformers.modeling_outputs import (
     BaseModelOutputWithCrossAttentions,
@@ -41,7 +39,11 @@ from transformers.modeling_outputs import (
     TokenClassifierOutput,
 )
 from transformers.modeling_utils import PreTrainedModel, SequenceSummary
-from transformers.pytorch_utils import apply_chunking_to_forward, find_pruneable_heads_and_indices, prune_linear_layer
+from transformers.pytorch_utils import (
+    apply_chunking_to_forward,
+    find_pruneable_heads_and_indices,
+    prune_linear_layer,
+)
 from transformers.utils import (
     ModelOutput,
     add_code_sample_docstrings,
@@ -50,27 +52,29 @@ from transformers.utils import (
     logging,
     replace_return_docstrings,
 )
-from configuration_electra import ElectraConfig
 
+from configuration_electra import ElectraConfig
 
 logger = logging.get_logger(__name__)
 
-_CHECKPOINT_FOR_DOC = "google/electra-small-discriminator"
-_CONFIG_FOR_DOC = "ElectraConfig"
-_TOKENIZER_FOR_DOC = "ElectraTokenizer"
+_CHECKPOINT_FOR_DOC = 'google/electra-small-discriminator'
+_CONFIG_FOR_DOC = 'ElectraConfig'
+_TOKENIZER_FOR_DOC = 'ElectraTokenizer'
 
 ELECTRA_PRETRAINED_MODEL_ARCHIVE_LIST = [
-    "google/electra-small-generator",
-    "google/electra-base-generator",
-    "google/electra-large-generator",
-    "google/electra-small-discriminator",
-    "google/electra-base-discriminator",
-    "google/electra-large-discriminator",
+    'google/electra-small-generator',
+    'google/electra-base-generator',
+    'google/electra-large-generator',
+    'google/electra-small-discriminator',
+    'google/electra-base-discriminator',
+    'google/electra-large-discriminator',
     # See all ELECTRA models at https://huggingface.co/models?filter=electra
 ]
 
 
-def load_tf_weights_in_electra(model, config, tf_checkpoint_path, discriminator_or_generator="discriminator"):
+def load_tf_weights_in_electra(
+    model, config, tf_checkpoint_path, discriminator_or_generator='discriminator'
+):
     """Load tf checkpoints in a pytorch model."""
     try:
         import re
@@ -79,18 +83,18 @@ def load_tf_weights_in_electra(model, config, tf_checkpoint_path, discriminator_
         import tensorflow as tf
     except ImportError:
         logger.error(
-            "Loading a TensorFlow model in PyTorch, requires TensorFlow to be installed. Please see "
-            "https://www.tensorflow.org/install/ for installation instructions."
+            'Loading a TensorFlow model in PyTorch, requires TensorFlow to be installed. Please see '
+            'https://www.tensorflow.org/install/ for installation instructions.'
         )
         raise
     tf_path = os.path.abspath(tf_checkpoint_path)
-    logger.info(f"Converting TensorFlow checkpoint from {tf_path}")
+    logger.info(f'Converting TensorFlow checkpoint from {tf_path}')
     # Load weights from TF model
     init_vars = tf.train.list_variables(tf_path)
     names = []
     arrays = []
     for name, shape in init_vars:
-        logger.info(f"Loading TF weight {name} with shape {shape}")
+        logger.info(f'Loading TF weight {name} with shape {shape}')
         array = tf.train.load_variable(tf_path, name)
         names.append(name)
         arrays.append(array)
@@ -99,44 +103,47 @@ def load_tf_weights_in_electra(model, config, tf_checkpoint_path, discriminator_
 
         try:
             if isinstance(model, ElectraForMaskedLM):
-                name = name.replace("electra/embeddings/", "generator/embeddings/")
+                name = name.replace('electra/embeddings/',
+                                    'generator/embeddings/')
 
-            if discriminator_or_generator == "generator":
-                name = name.replace("electra/", "discriminator/")
-                name = name.replace("generator/", "electra/")
+            if discriminator_or_generator == 'generator':
+                name = name.replace('electra/', 'discriminator/')
+                name = name.replace('generator/', 'electra/')
 
-            name = name.replace("dense_1", "dense_prediction")
-            name = name.replace("generator_predictions/output_bias", "generator_lm_head/bias")
+            name = name.replace('dense_1', 'dense_prediction')
+            name = name.replace(
+                'generator_predictions/output_bias', 'generator_lm_head/bias'
+            )
 
-            name = name.split("/")
+            name = name.split('/')
             # print(original_name, name)
             # adam_v and adam_m are variables used in AdamWeightDecayOptimizer to calculated m and v
             # which are not required for using pretrained model
-            if any(n in ["global_step", "temperature"] for n in name):
-                logger.info(f"Skipping {original_name}")
+            if any(n in ['global_step', 'temperature'] for n in name):
+                logger.info(f'Skipping {original_name}')
                 continue
             pointer = model
             for m_name in name:
-                if re.fullmatch(r"[A-Za-z]+_\d+", m_name):
-                    scope_names = re.split(r"_(\d+)", m_name)
+                if re.fullmatch(r'[A-Za-z]+_\d+', m_name):
+                    scope_names = re.split(r'_(\d+)', m_name)
                 else:
                     scope_names = [m_name]
-                if scope_names[0] == "kernel" or scope_names[0] == "gamma":
-                    pointer = getattr(pointer, "weight")
-                elif scope_names[0] == "output_bias" or scope_names[0] == "beta":
-                    pointer = getattr(pointer, "bias")
-                elif scope_names[0] == "output_weights":
-                    pointer = getattr(pointer, "weight")
-                elif scope_names[0] == "squad":
-                    pointer = getattr(pointer, "classifier")
+                if scope_names[0] == 'kernel' or scope_names[0] == 'gamma':
+                    pointer = getattr(pointer, 'weight')
+                elif scope_names[0] == 'output_bias' or scope_names[0] == 'beta':
+                    pointer = getattr(pointer, 'bias')
+                elif scope_names[0] == 'output_weights':
+                    pointer = getattr(pointer, 'weight')
+                elif scope_names[0] == 'squad':
+                    pointer = getattr(pointer, 'classifier')
                 else:
                     pointer = getattr(pointer, scope_names[0])
                 if len(scope_names) >= 2:
                     num = int(scope_names[1])
                     pointer = pointer[num]
-            if m_name.endswith("_embeddings"):
-                pointer = getattr(pointer, "weight")
-            elif m_name == "kernel":
+            if m_name.endswith('_embeddings'):
+                pointer = getattr(pointer, 'weight')
+            elif m_name == 'kernel':
                 array = np.transpose(array)
             try:
                 pass
@@ -145,10 +152,10 @@ def load_tf_weights_in_electra(model, config, tf_checkpoint_path, discriminator_
             except AssertionError as e:
                 e.args += (pointer.shape, array.shape)
                 raise
-            print(f"Initialize PyTorch weight {name}", original_name)
+            print(f'Initialize PyTorch weight {name}', original_name)
             pointer.data = torch.from_numpy(array)
         except AttributeError as e:
-            print(f"Skipping {original_name}", name, e)
+            print(f'Skipping {original_name}', name, e)
             continue
     return model
 
@@ -158,20 +165,30 @@ class ElectraEmbeddings(nn.Module):
 
     def __init__(self, config):
         super().__init__()
-        self.word_embeddings = nn.Embedding(config.vocab_size, config.embedding_size, padding_idx=config.pad_token_id)
-        self.position_embeddings = nn.Embedding(config.max_position_embeddings, config.embedding_size)
-        self.token_type_embeddings = nn.Embedding(config.type_vocab_size, config.embedding_size)
+        self.word_embeddings = nn.Embedding(
+            config.vocab_size, config.embedding_size, padding_idx=config.pad_token_id
+        )
+        self.position_embeddings = nn.Embedding(
+            config.max_position_embeddings, config.embedding_size
+        )
+        self.token_type_embeddings = nn.Embedding(
+            config.type_vocab_size, config.embedding_size
+        )
 
         # self.LayerNorm is not snake-cased to stick with TensorFlow model variable name and be able to load
         # any TensorFlow checkpoint file
-        self.LayerNorm = nn.LayerNorm(config.embedding_size, eps=config.layer_norm_eps)
+        self.LayerNorm = nn.LayerNorm(
+            config.embedding_size, eps=config.layer_norm_eps)
         self.dropout = nn.Dropout(config.hidden_dropout_prob)
 
         # position_ids (1, len position emb) is contiguous in memory and exported when serialized
-        self.register_buffer("position_ids", torch.arange(config.max_position_embeddings).expand((1, -1)))
-        if version.parse(torch.__version__) > version.parse("1.6.0"):
+        self.register_buffer(
+            'position_ids', torch.arange(
+                config.max_position_embeddings).expand((1, -1))
+        )
+        if version.parse(torch.__version__) > version.parse('1.6.0'):
             self.register_buffer(
-                "token_type_ids",
+                'token_type_ids',
                 torch.zeros(self.position_ids.size(), dtype=torch.long),
                 persistent=False,
             )
@@ -193,18 +210,24 @@ class ElectraEmbeddings(nn.Module):
         seq_length = input_shape[1]
 
         if position_ids is None:
-            position_ids = self.position_ids[:, past_key_values_length : seq_length + past_key_values_length]
+            position_ids = self.position_ids[
+                :, past_key_values_length: seq_length + past_key_values_length
+            ]
 
         # Setting the token_type_ids to the registered buffer in constructor where it is all zeros, which usually occurs
         # when its auto-generated, registered buffer helps users when tracing the model without passing token_type_ids, solves
         # issue #5664
         if token_type_ids is None:
-            if hasattr(self, "token_type_ids"):
+            if hasattr(self, 'token_type_ids'):
                 buffered_token_type_ids = self.token_type_ids[:, :seq_length]
-                buffered_token_type_ids_expanded = buffered_token_type_ids.expand(input_shape[0], seq_length)
+                buffered_token_type_ids_expanded = buffered_token_type_ids.expand(
+                    input_shape[0], seq_length
+                )
                 token_type_ids = buffered_token_type_ids_expanded
             else:
-                token_type_ids = torch.zeros(input_shape, dtype=torch.long, device=self.position_ids.device)
+                token_type_ids = torch.zeros(
+                    input_shape, dtype=torch.long, device=self.position_ids.device
+                )
 
         if inputs_embeds is None:
             inputs_embeds = self.word_embeddings(input_ids)
@@ -224,26 +247,33 @@ class ElectraScaledDotProductAttention(nn.Module):
         super().__init__()
         encoder_config = config.nas_config['encoder_layers'][layer_num]
 
-        if config.hidden_size % encoder_config['num_operation_heads'] != 0 and not hasattr(config, "embedding_size"):
+        if config.hidden_size % encoder_config[
+            'num_operation_heads'
+        ] != 0 and not hasattr(config, 'embedding_size'):
             raise ValueError(
-                f"The hidden size ({config.hidden_size}) is not a multiple of the number of attention "
+                f'The hidden size ({config.hidden_size}) is not a multiple of the number of attention '
                 f"heads ({encoder_config['num_operation_heads']})"
             )
 
         self.num_attention_heads = encoder_config['num_operation_heads']
-        self.attention_head_size = int(config.hidden_size / encoder_config['num_operation_heads'])
+        self.attention_head_size = int(
+            config.hidden_size / encoder_config['num_operation_heads']
+        )
         self.all_head_size = self.num_attention_heads * self.attention_head_size
 
         self.query = nn.Linear(config.hidden_size, self.all_head_size)
         self.key = nn.Linear(config.hidden_size, self.all_head_size)
         self.value = nn.Linear(config.hidden_size, self.all_head_size)
-        
+
         self.softmax = nn.Softmax(dim=-1)
-        
+
         self.dropout = nn.Dropout(config.attention_probs_dropout_prob)
 
     def transpose_for_scores(self, x: torch.Tensor) -> torch.Tensor:
-        new_x_shape = x.size()[:-1] + (self.num_attention_heads, self.attention_head_size)
+        new_x_shape = x.size()[:-1] + (
+            self.num_attention_heads,
+            self.attention_head_size,
+        )
         x = x.view(new_x_shape)
         return x.permute(0, 2, 1, 3)
 
@@ -259,9 +289,11 @@ class ElectraScaledDotProductAttention(nn.Module):
         query_layer = self.transpose_for_scores(mixed_query_layer)
 
         # Take the dot product between "query" and "key" to get the raw attention scores.
-        attention_scores = torch.matmul(query_layer, key_layer.transpose(-1, -2))
+        attention_scores = torch.matmul(
+            query_layer, key_layer.transpose(-1, -2))
 
-        attention_scores = attention_scores / math.sqrt(self.attention_head_size)
+        attention_scores = attention_scores / \
+            math.sqrt(self.attention_head_size)
 
         # Normalize the attention scores to probabilities.
         attention_probs = self.softmax(attention_scores)
@@ -273,7 +305,8 @@ class ElectraScaledDotProductAttention(nn.Module):
         context_layer = torch.matmul(attention_probs, value_layer)
 
         context_layer = context_layer.permute(0, 2, 1, 3).contiguous()
-        new_context_layer_shape = context_layer.size()[:-2] + (self.all_head_size,)
+        new_context_layer_shape = context_layer.size()[
+            :-2] + (self.all_head_size,)
         context_layer = context_layer.view(new_context_layer_shape)
 
         outputs = (context_layer,)
@@ -287,28 +320,36 @@ class ElectraWeightedMultiplcativeAttention(nn.Module):
         super().__init__()
         encoder_config = config.nas_config['encoder_layers'][layer_num]
 
-        if config.hidden_size % encoder_config['num_operation_heads'] != 0 and not hasattr(config, "embedding_size"):
+        if config.hidden_size % encoder_config[
+            'num_operation_heads'
+        ] != 0 and not hasattr(config, 'embedding_size'):
             raise ValueError(
-                f"The hidden size ({config.hidden_size}) is not a multiple of the number of attention "
+                f'The hidden size ({config.hidden_size}) is not a multiple of the number of attention '
                 f"heads ({encoder_config['num_operation_heads']})"
             )
 
         self.num_attention_heads = encoder_config['num_operation_heads']
-        self.attention_head_size = int(config.hidden_size / encoder_config['num_operation_heads'])
+        self.attention_head_size = int(
+            config.hidden_size / encoder_config['num_operation_heads']
+        )
         self.all_head_size = self.num_attention_heads * self.attention_head_size
 
         self.query = nn.Linear(config.hidden_size, self.all_head_size)
         self.key = nn.Linear(config.hidden_size, self.all_head_size)
         self.value = nn.Linear(config.hidden_size, self.all_head_size)
 
-        self.weight = nn.Linear(self.all_head_size, self.all_head_size, bias=False)
-        
+        self.weight = nn.Linear(
+            self.all_head_size, self.all_head_size, bias=False)
+
         self.softmax = nn.Softmax(dim=-1)
 
         self.dropout = nn.Dropout(config.attention_probs_dropout_prob)
 
     def transpose_for_scores(self, x: torch.Tensor) -> torch.Tensor:
-        new_x_shape = x.size()[:-1] + (self.num_attention_heads, self.attention_head_size)
+        new_x_shape = x.size()[:-1] + (
+            self.num_attention_heads,
+            self.attention_head_size,
+        )
         x = x.view(new_x_shape)
         return x.permute(0, 2, 1, 3)
 
@@ -321,7 +362,7 @@ class ElectraWeightedMultiplcativeAttention(nn.Module):
     ) -> Tuple[torch.Tensor]:
         mixed_query_layer = self.query(hidden_states)
         weighted_mixed_query_layer = self.weight(mixed_query_layer)
-    
+
         key_layer = self.transpose_for_scores(self.key(hidden_states))
         value_layer = self.transpose_for_scores(self.value(hidden_states))
 
@@ -329,9 +370,11 @@ class ElectraWeightedMultiplcativeAttention(nn.Module):
         query_layer = self.transpose_for_scores(weighted_mixed_query_layer)
 
         # Take the dot product between "query" and "key" to get the raw attention scores.
-        attention_scores = torch.matmul(query_layer, key_layer.transpose(-1, -2))
+        attention_scores = torch.matmul(
+            query_layer, key_layer.transpose(-1, -2))
 
-        attention_scores = attention_scores / math.sqrt(self.attention_head_size)
+        attention_scores = attention_scores / \
+            math.sqrt(self.attention_head_size)
         if attention_mask is not None:
             # Apply the attention mask is (precomputed for all layers in ElectraModel forward() function)
             attention_scores = attention_scores + attention_mask
@@ -350,10 +393,13 @@ class ElectraWeightedMultiplcativeAttention(nn.Module):
         context_layer = torch.matmul(attention_probs, value_layer)
 
         context_layer = context_layer.permute(0, 2, 1, 3).contiguous()
-        new_context_layer_shape = context_layer.size()[:-2] + (self.all_head_size,)
+        new_context_layer_shape = context_layer.size()[
+            :-2] + (self.all_head_size,)
         context_layer = context_layer.view(new_context_layer_shape)
 
-        outputs = (context_layer, attention_probs) if output_attentions else (context_layer,)
+        outputs = (
+            (context_layer, attention_probs) if output_attentions else (context_layer,)
+        )
 
         return outputs
 
@@ -363,10 +409,13 @@ class ElectraSelfOutput(nn.Module):
     def __init__(self, config):
         super().__init__()
         self.dense = nn.Linear(config.hidden_size, config.hidden_size)
-        self.LayerNorm = nn.LayerNorm(config.hidden_size, eps=config.layer_norm_eps)
+        self.LayerNorm = nn.LayerNorm(
+            config.hidden_size, eps=config.layer_norm_eps)
         self.dropout = nn.Dropout(config.hidden_dropout_prob)
 
-    def forward(self, hidden_states: torch.Tensor, input_tensor: torch.Tensor) -> torch.Tensor:
+    def forward(
+        self, hidden_states: torch.Tensor, input_tensor: torch.Tensor
+    ) -> torch.Tensor:
         hidden_states = self.dense(hidden_states)
         hidden_states = self.dropout(hidden_states)
         hidden_states = self.LayerNorm(hidden_states + input_tensor)
@@ -380,23 +429,26 @@ class ElectraAttention(nn.Module):
 
         encoder_config = config.nas_config['encoder_layers'][layer_num]
 
-        if encoder_config['operation_type'] == "SA":
-            if encoder_config['operation_parameter'] == "SDP":
-                self.operation = ElectraScaledDotProductAttention(config, layer_num)
-            elif encoder_config['operation_parameter'] == "WMA":
-                self.operation = ElectraWeightedMultiplcativeAttention(config, layer_num)
+        if encoder_config['operation_type'] == 'SA':
+            if encoder_config['operation_parameter'] == 'SDP':
+                self.operation = ElectraScaledDotProductAttention(
+                    config, layer_num)
+            elif encoder_config['operation_parameter'] == 'WMA':
+                self.operation = ElectraWeightedMultiplcativeAttention(
+                    config, layer_num
+                )
             else:
                 raise ValueError(
                     f"The operation parameter( {encoder_config['operation_parameter']}) is not valid for the "
                     f"operation type ({encoder_config['operation_type']})"
                 )
-        elif encoder_config['operation_type'] == "DSC":
+        elif encoder_config['operation_type'] == 'DSC':
             self.operation = ElectraConvSelfAttention(config, layer_num)
         else:
             raise ValueError(
-            f"The operation type ({encoder_config['operation_type']}) is not valid"
+                f"The operation type ({encoder_config['operation_type']}) is not valid"
             )
-        
+
         self.output = ElectraSelfOutput(config)
         self.pruned_heads = set()
 
@@ -404,7 +456,10 @@ class ElectraAttention(nn.Module):
         if len(heads) == 0:
             return
         heads, index = find_pruneable_heads_and_indices(
-            heads, self.self.num_attention_heads, self.self.attention_head_size, self.pruned_heads
+            heads,
+            self.self.num_attention_heads,
+            self.self.attention_head_size,
+            self.pruned_heads,
         )
 
         # Prune linear layers
@@ -414,8 +469,11 @@ class ElectraAttention(nn.Module):
         self.output.dense = prune_linear_layer(self.output.dense, index, dim=1)
 
         # Update hyper params and store pruned heads
-        self.self.num_attention_heads = self.self.num_attention_heads - len(heads)
-        self.self.all_head_size = self.self.attention_head_size * self.self.num_attention_heads
+        self.self.num_attention_heads = self.self.num_attention_heads - \
+            len(heads)
+        self.self.all_head_size = (
+            self.self.attention_head_size * self.self.num_attention_heads
+        )
         self.pruned_heads = self.pruned_heads.union(heads)
 
     def forward(
@@ -426,7 +484,9 @@ class ElectraAttention(nn.Module):
             hidden_states,
         )
         attention_output = self.output(self_outputs[0], hidden_states)
-        outputs = (attention_output,) + self_outputs[1:]  # add attentions if we output them
+        outputs = (attention_output,) + self_outputs[
+            1:
+        ]  # add attentions if we output them
         return outputs
 
 
@@ -437,24 +497,31 @@ class ElectraDiscreteFourierTransform(nn.Module):
 
         encoder_config = config.nas_config['encoder_layers'][layer_num]
 
-        if config.hidden_size % encoder_config['num_operation_heads'] != 0 and not hasattr(config, "embedding_size"):
+        if config.hidden_size % encoder_config[
+            'num_operation_heads'
+        ] != 0 and not hasattr(config, 'embedding_size'):
             raise ValueError(
-                f"The hidden size ({config.hidden_size}) is not a multiple of the number of attention "
+                f'The hidden size ({config.hidden_size}) is not a multiple of the number of attention '
                 f"heads ({encoder_config['num_operation_heads']})"
             )
 
         self.num_attention_heads = encoder_config['num_operation_heads']
-        self.attention_head_size = int(config.hidden_size / encoder_config['num_operation_heads'])
+        self.attention_head_size = int(
+            config.hidden_size / encoder_config['num_operation_heads']
+        )
         self.all_head_size = self.num_attention_heads * self.attention_head_size
 
         self.input = nn.Linear(config.hidden_size, self.all_head_size)
-        
+
         self.softmax = nn.Softmax(dim=-1)
 
         self.dropout = nn.Dropout(config.attention_probs_dropout_prob)
 
     def transpose_for_scores(self, x: torch.Tensor) -> torch.Tensor:
-        new_x_shape = x.size()[:-1] + (self.num_attention_heads, self.attention_head_size)
+        new_x_shape = x.size()[:-1] + (
+            self.num_attention_heads,
+            self.attention_head_size,
+        )
         x = x.view(new_x_shape)
         return x.permute(0, 2, 1, 3)
 
@@ -465,11 +532,12 @@ class ElectraDiscreteFourierTransform(nn.Module):
         input_layer = self.transpose_for_scores(self.input(hidden_states))
 
         context_layer = torch.fft.fft2(input_layer).real
-        
+
         softmax = self.softmax(context_layer)
 
         context_layer = context_layer.permute(0, 2, 1, 3).contiguous()
-        new_context_layer_shape = context_layer.size()[:-2] + (self.all_head_size,)
+        new_context_layer_shape = context_layer.size()[
+            :-2] + (self.all_head_size,)
         context_layer = context_layer.view(new_context_layer_shape)
 
         outputs = (context_layer,)
@@ -495,7 +563,8 @@ def dct(x, norm=None):
 
     Vc = torch.view_as_real(torch.fft.fft(v, dim=1))
 
-    k = - torch.arange(N, dtype=x.dtype, device=x.device)[None, :] * np.pi / (2 * N)
+    k = -torch.arange(N, dtype=x.dtype,
+                      device=x.device)[None, :] * np.pi / (2 * N)
     W_r = torch.cos(k)
     W_i = torch.sin(k)
 
@@ -532,24 +601,31 @@ class ElectraDiscreteCosineTransform(nn.Module):
 
         encoder_config = config.nas_config['encoder_layers'][layer_num]
 
-        if config.hidden_size % encoder_config['num_operation_heads'] != 0 and not hasattr(config, "embedding_size"):
+        if config.hidden_size % encoder_config[
+            'num_operation_heads'
+        ] != 0 and not hasattr(config, 'embedding_size'):
             raise ValueError(
-                f"The hidden size ({config.hidden_size}) is not a multiple of the number of attention "
+                f'The hidden size ({config.hidden_size}) is not a multiple of the number of attention '
                 f"heads ({encoder_config['num_operation_heads']})"
             )
 
         self.num_attention_heads = encoder_config['num_operation_heads']
-        self.attention_head_size = int(config.hidden_size / encoder_config['num_operation_heads'])
+        self.attention_head_size = int(
+            config.hidden_size / encoder_config['num_operation_heads']
+        )
         self.all_head_size = self.num_attention_heads * self.attention_head_size
 
         self.input = nn.Linear(config.hidden_size, self.all_head_size)
-        
+
         self.softmax = nn.Softmax(dim=-1)
 
         self.dropout = nn.Dropout(config.attention_probs_dropout_prob)
 
     def transpose_for_scores(self, x: torch.Tensor) -> torch.Tensor:
-        new_x_shape = x.size()[:-1] + (self.num_attention_heads, self.attention_head_size)
+        new_x_shape = x.size()[:-1] + (
+            self.num_attention_heads,
+            self.attention_head_size,
+        )
         x = x.view(new_x_shape)
         return x.permute(0, 2, 1, 3)
 
@@ -560,11 +636,12 @@ class ElectraDiscreteCosineTransform(nn.Module):
         input_layer = self.transpose_for_scores(self.input(hidden_states))
 
         context_layer = dct_2d(input_layer)
-        
+
         softmax = self.softmax(context_layer)
 
         context_layer = context_layer.permute(0, 2, 1, 3).contiguous()
-        new_context_layer_shape = context_layer.size()[:-2] + (self.all_head_size,)
+        new_context_layer_shape = context_layer.size()[
+            :-2] + (self.all_head_size,)
         context_layer = context_layer.view(new_context_layer_shape)
 
         outputs = (context_layer,)
@@ -579,9 +656,9 @@ class ElectraLinearTransform(nn.Module):
 
         encoder_config = config.nas_config['encoder_layers'][layer_num]
 
-        if encoder_config['operation_parameter'] == "DFT":
+        if encoder_config['operation_parameter'] == 'DFT':
             self.operation = ElectraDiscreteFourierTransform(config, layer_num)
-        elif encoder_config['operation_parameter'] == "DCT":
+        elif encoder_config['operation_parameter'] == 'DCT':
             self.operation = ElectraDiscreteCosineTransform(config, layer_num)
         else:
             raise ValueError(
@@ -614,11 +691,15 @@ class SeparableConv1D(nn.Module):
             padding=kernel_size // 2,
             bias=False,
         )
-        self.pointwise = nn.Conv1d(input_filters, output_filters, kernel_size=1, bias=False)
+        self.pointwise = nn.Conv1d(
+            input_filters, output_filters, kernel_size=1, bias=False
+        )
         self.bias = nn.Parameter(torch.zeros(output_filters, 1))
 
-        self.depthwise.weight.data.normal_(mean=0.0, std=config.initializer_range)
-        self.pointwise.weight.data.normal_(mean=0.0, std=config.initializer_range)
+        self.depthwise.weight.data.normal_(
+            mean=0.0, std=config.initializer_range)
+        self.pointwise.weight.data.normal_(
+            mean=0.0, std=config.initializer_range)
 
     def forward(self, hidden_states: torch.Tensor) -> torch.Tensor:
         x = self.depthwise(hidden_states)
@@ -634,9 +715,11 @@ class ElectraConvSelfAttention(nn.Module):
 
         encoder_config = config.nas_config['encoder_layers'][layer_num]
 
-        if config.hidden_size % encoder_config['num_operation_heads'] != 0 and not hasattr(config, "embedding_size"):
+        if config.hidden_size % encoder_config[
+            'num_operation_heads'
+        ] != 0 and not hasattr(config, 'embedding_size'):
             raise ValueError(
-                f"The hidden size ({config.hidden_size}) is not a multiple of the number of attention "
+                f'The hidden size ({config.hidden_size}) is not a multiple of the number of attention '
                 f"heads ({encoder_config['num_operation_heads']})"
             )
 
@@ -648,7 +731,9 @@ class ElectraConvSelfAttention(nn.Module):
                 f"operation type ({encoder_config['operation_type']})"
             )
 
-        new_num_attention_heads = encoder_config['num_operation_heads'] // config.conv_head_ratio
+        new_num_attention_heads = (
+            encoder_config['num_operation_heads'] // config.conv_head_ratio
+        )
         if new_num_attention_heads < 1:
             self.conv_head_ratio = config.conv_head_ratio
             self.num_attention_heads = 1
@@ -657,9 +742,12 @@ class ElectraConvSelfAttention(nn.Module):
             self.conv_head_ratio = config.conv_head_ratio
 
         if config.hidden_size % self.num_attention_heads != 0:
-            raise ValueError("hidden_size should be divisible by num_attention_heads")
-        
-        self.attention_head_size = config.hidden_size // encoder_config['num_operation_heads']
+            raise ValueError(
+                'hidden_size should be divisible by num_attention_heads')
+
+        self.attention_head_size = (
+            config.hidden_size // encoder_config['num_operation_heads']
+        )
         self.all_head_size = self.num_attention_heads * self.attention_head_size
 
         self.query = nn.Linear(config.hidden_size, self.all_head_size)
@@ -669,19 +757,25 @@ class ElectraConvSelfAttention(nn.Module):
         self.key_conv_attn_layer = SeparableConv1D(
             config, config.hidden_size, self.all_head_size, self.conv_kernel_size
         )
-        self.conv_kernel_layer = nn.Linear(self.all_head_size, self.num_attention_heads * self.conv_kernel_size)
+        self.conv_kernel_layer = nn.Linear(
+            self.all_head_size, self.num_attention_heads * self.conv_kernel_size
+        )
         self.conv_out_layer = nn.Linear(config.hidden_size, self.all_head_size)
 
         self.softmax = nn.Softmax(dim=-1)
-        
+
         self.unfold = nn.Unfold(
-            kernel_size=[self.conv_kernel_size, 1], padding=[int((self.conv_kernel_size - 1) / 2), 0]
+            kernel_size=[self.conv_kernel_size, 1],
+            padding=[int((self.conv_kernel_size - 1) / 2), 0],
         )
 
         self.dropout = nn.Dropout(config.attention_probs_dropout_prob)
 
     def transpose_for_scores(self, x):
-        new_x_shape = x.size()[:-1] + (self.num_attention_heads, self.attention_head_size)
+        new_x_shape = x.size()[:-1] + (
+            self.num_attention_heads,
+            self.attention_head_size,
+        )
         x = x.view(*new_x_shape)
         return x.permute(0, 2, 1, 3)
 
@@ -695,21 +789,29 @@ class ElectraConvSelfAttention(nn.Module):
         mixed_key_layer = self.key(hidden_states)
         mixed_value_layer = self.value(hidden_states)
 
-        mixed_key_conv_attn_layer = self.key_conv_attn_layer(hidden_states.transpose(1, 2))
+        mixed_key_conv_attn_layer = self.key_conv_attn_layer(
+            hidden_states.transpose(1, 2)
+        )
         mixed_key_conv_attn_layer = mixed_key_conv_attn_layer.transpose(1, 2)
 
         query_layer = self.transpose_for_scores(mixed_query_layer)
         key_layer = self.transpose_for_scores(mixed_key_layer)
         value_layer = self.transpose_for_scores(mixed_value_layer)
-        conv_attn_layer = torch.multiply(mixed_key_conv_attn_layer, mixed_query_layer)
+        conv_attn_layer = torch.multiply(
+            mixed_key_conv_attn_layer, mixed_query_layer)
 
         conv_kernel_layer = self.conv_kernel_layer(conv_attn_layer)
-        conv_kernel_layer = torch.reshape(conv_kernel_layer, [-1, self.conv_kernel_size, 1])
+        conv_kernel_layer = torch.reshape(
+            conv_kernel_layer, [-1, self.conv_kernel_size, 1]
+        )
         conv_kernel_layer = torch.softmax(conv_kernel_layer, dim=1)
 
         conv_out_layer = self.conv_out_layer(hidden_states)
-        conv_out_layer = torch.reshape(conv_out_layer, [batch_size, -1, self.all_head_size])
-        conv_out_layer = conv_out_layer.transpose(1, 2).contiguous().unsqueeze(-1)
+        conv_out_layer = torch.reshape(
+            conv_out_layer, [batch_size, -1, self.all_head_size]
+        )
+        conv_out_layer = conv_out_layer.transpose(
+            1, 2).contiguous().unsqueeze(-1)
         conv_out_layer = nn.functional.unfold(
             conv_out_layer,
             kernel_size=[self.conv_kernel_size, 1],
@@ -720,13 +822,19 @@ class ElectraConvSelfAttention(nn.Module):
         conv_out_layer = conv_out_layer.transpose(1, 2).reshape(
             batch_size, -1, self.all_head_size, self.conv_kernel_size
         )
-        conv_out_layer = torch.reshape(conv_out_layer, [-1, self.attention_head_size, self.conv_kernel_size])
+        conv_out_layer = torch.reshape(
+            conv_out_layer, [-1, self.attention_head_size,
+                             self.conv_kernel_size]
+        )
         conv_out_layer = torch.matmul(conv_out_layer, conv_kernel_layer)
-        conv_out_layer = torch.reshape(conv_out_layer, [-1, self.all_head_size])
+        conv_out_layer = torch.reshape(
+            conv_out_layer, [-1, self.all_head_size])
 
         # Take the dot product between "query" and "key" to get the raw attention scores.
-        attention_scores = torch.matmul(query_layer, key_layer.transpose(-1, -2))
-        attention_scores = attention_scores / math.sqrt(self.attention_head_size)
+        attention_scores = torch.matmul(
+            query_layer, key_layer.transpose(-1, -2))
+        attention_scores = attention_scores / \
+            math.sqrt(self.attention_head_size)
 
         # Normalize the attention scores to probabilities.
         attention_probs = self.softmax(attention_scores)
@@ -738,25 +846,34 @@ class ElectraConvSelfAttention(nn.Module):
         context_layer = torch.matmul(attention_probs, value_layer)
         context_layer = context_layer.permute(0, 2, 1, 3).contiguous()
 
-        conv_out = torch.reshape(conv_out_layer, [batch_size, -1, self.num_attention_heads, self.attention_head_size])
+        conv_out = torch.reshape(
+            conv_out_layer,
+            [batch_size, -1, self.num_attention_heads, self.attention_head_size],
+        )
         context_layer = torch.cat([context_layer, conv_out], 2)
 
-        new_context_layer_shape = context_layer.size()[:-2] + (self.conv_head_ratio * self.all_head_size,)
+        new_context_layer_shape = context_layer.size()[:-2] + (
+            self.conv_head_ratio * self.all_head_size,
+        )
         context_layer = context_layer.view(*new_context_layer_shape)
 
         outputs = (context_layer,)
         return outputs
-        
+
 
 # Copied from transformers.models.bert.modeling_bert.BertIntermediate
 class ElectraIntermediate(nn.Module):
     def __init__(self, config, layer_num):
         super().__init__()
         encoder_config = config.nas_config['encoder_layers'][layer_num]
-        
+
         self.dense_in = nn.Linear(config.hidden_size, config.intermediate_size)
-        self.dense_list = nn.ModuleList([nn.Linear(config.intermediate_size, config.intermediate_size) 
-                                         for i in range(encoder_config['num_feed_forward'] - 1)])
+        self.dense_list = nn.ModuleList(
+            [
+                nn.Linear(config.intermediate_size, config.intermediate_size)
+                for i in range(encoder_config['num_feed_forward'] - 1)
+            ]
+        )
 
         if isinstance(config.hidden_act, str):
             self.intermediate_act_fn = ACT2FN[config.hidden_act]
@@ -777,10 +894,13 @@ class ElectraOutput(nn.Module):
     def __init__(self, config):
         super().__init__()
         self.dense = nn.Linear(config.intermediate_size, config.hidden_size)
-        self.LayerNorm = nn.LayerNorm(config.hidden_size, eps=config.layer_norm_eps)
+        self.LayerNorm = nn.LayerNorm(
+            config.hidden_size, eps=config.layer_norm_eps)
         self.dropout = nn.Dropout(config.hidden_dropout_prob)
 
-    def forward(self, hidden_states: torch.Tensor, input_tensor: torch.Tensor) -> torch.Tensor:
+    def forward(
+        self, hidden_states: torch.Tensor, input_tensor: torch.Tensor
+    ) -> torch.Tensor:
         hidden_states = self.dense(hidden_states)
         hidden_states = self.dropout(hidden_states)
         hidden_states = self.LayerNorm(hidden_states + input_tensor)
@@ -796,9 +916,12 @@ class ElectraLayer(nn.Module):
 
         encoder_config = config.nas_config['encoder_layers'][layer_num]
 
-        if encoder_config['operation_type'] == "SA" or encoder_config['operation_type'] == "DSC":
+        if (
+            encoder_config['operation_type'] == 'SA'
+            or encoder_config['operation_type'] == 'DSC'
+        ):
             self.operation = ElectraAttention(config, layer_num)
-        elif encoder_config['operation_type'] == "LT":
+        elif encoder_config['operation_type'] == 'LT':
             self.operation = ElectraLinearTransform(config, layer_num)
         else:
             raise ValueError(
@@ -819,7 +942,10 @@ class ElectraLayer(nn.Module):
         outputs = self_operation_outputs[1:]
 
         layer_output = apply_chunking_to_forward(
-            self.feed_forward_chunk, self.chunk_size_feed_forward, self.seq_len_dim, attention_output
+            self.feed_forward_chunk,
+            self.chunk_size_feed_forward,
+            self.seq_len_dim,
+            attention_output,
         )
         outputs = (layer_output,) + outputs
 
@@ -836,7 +962,9 @@ class ElectraEncoder(nn.Module):
     def __init__(self, config):
         super().__init__()
         self.config = config
-        self.layer = nn.ModuleList([ElectraLayer(config, i) for i in range(config.num_hidden_layers)])
+        self.layer = nn.ModuleList(
+            [ElectraLayer(config, i) for i in range(config.num_hidden_layers)]
+        )
         self.gradient_checkpointing = False
 
     def forward(
@@ -854,7 +982,9 @@ class ElectraEncoder(nn.Module):
     ) -> Union[Tuple[torch.Tensor], BaseModelOutputWithPastAndCrossAttentions]:
         all_hidden_states = () if output_hidden_states else None
         all_self_attentions = () if output_attentions else None
-        all_cross_attentions = () if output_attentions and self.config.add_cross_attention else None
+        all_cross_attentions = (
+            () if output_attentions and self.config.add_cross_attention else None
+        )
 
         next_decoder_cache = () if use_cache else None
         for i, layer_module in enumerate(self.layer):
@@ -865,10 +995,9 @@ class ElectraEncoder(nn.Module):
             past_key_value = past_key_values[i] if past_key_values is not None else None
 
             if self.gradient_checkpointing and self.training:
-
                 if use_cache:
                     logger.warning(
-                        "`use_cache=True` is incompatible with gradient checkpointing. Setting `use_cache=False`..."
+                        '`use_cache=True` is incompatible with gradient checkpointing. Setting `use_cache=False`...'
                     )
                     use_cache = False
 
@@ -893,7 +1022,8 @@ class ElectraEncoder(nn.Module):
             if output_attentions:
                 all_self_attentions = all_self_attentions + (layer_outputs[1],)
                 if self.config.add_cross_attention:
-                    all_cross_attentions = all_cross_attentions + (layer_outputs[2],)
+                    all_cross_attentions = all_cross_attentions + \
+                        (layer_outputs[2],)
 
         if output_hidden_states:
             all_hidden_states = all_hidden_states + (hidden_states,)
@@ -943,12 +1073,13 @@ class ElectraGeneratorPredictions(nn.Module):
     def __init__(self, config):
         super().__init__()
 
-        self.LayerNorm = nn.LayerNorm(config.embedding_size, eps=config.layer_norm_eps)
+        self.LayerNorm = nn.LayerNorm(
+            config.embedding_size, eps=config.layer_norm_eps)
         self.dense = nn.Linear(config.hidden_size, config.embedding_size)
 
     def forward(self, generator_hidden_states):
         hidden_states = self.dense(generator_hidden_states)
-        hidden_states = get_activation("gelu")(hidden_states)
+        hidden_states = get_activation('gelu')(hidden_states)
         hidden_states = self.LayerNorm(hidden_states)
 
         return hidden_states
@@ -962,10 +1093,13 @@ class ElectraPreTrainedModel(PreTrainedModel):
 
     config_class = ElectraConfig
     load_tf_weights = load_tf_weights_in_electra
-    base_model_prefix = "electra"
+    base_model_prefix = 'electra'
     supports_gradient_checkpointing = True
-    _keys_to_ignore_on_load_missing = [r"position_ids"]
-    _keys_to_ignore_on_load_unexpected = [r"electra.embeddings_project.weight", r"electra.embeddings_project.bias"]
+    _keys_to_ignore_on_load_missing = [r'position_ids']
+    _keys_to_ignore_on_load_unexpected = [
+        r'electra.embeddings_project.weight',
+        r'electra.embeddings_project.bias',
+    ]
 
     # Copied from transformers.models.bert.modeling_bert.BertPreTrainedModel._init_weights
     def _init_weights(self, module):
@@ -973,11 +1107,13 @@ class ElectraPreTrainedModel(PreTrainedModel):
         if isinstance(module, nn.Linear):
             # Slightly different from the TF version which uses truncated_normal for initialization
             # cf https://github.com/pytorch/pytorch/pull/5617
-            module.weight.data.normal_(mean=0.0, std=self.config.initializer_range)
+            module.weight.data.normal_(
+                mean=0.0, std=self.config.initializer_range)
             if module.bias is not None:
                 module.bias.data.zero_()
         elif isinstance(module, nn.Embedding):
-            module.weight.data.normal_(mean=0.0, std=self.config.initializer_range)
+            module.weight.data.normal_(
+                mean=0.0, std=self.config.initializer_range)
             if module.padding_idx is not None:
                 module.weight.data[module.padding_idx].zero_()
         elif isinstance(module, nn.LayerNorm):
@@ -1095,11 +1231,11 @@ ELECTRA_INPUTS_DOCSTRING = r"""
 
 
 @add_start_docstrings(
-    "The bare Electra Model transformer outputting raw hidden-states without any specific head on top. Identical to "
-    "the BERT model except that it uses an additional linear layer between the embedding layer and the encoder if the "
-    "hidden size and embedding size are different. "
-    ""
-    "Both the generator and discriminator checkpoints may be loaded into this model.",
+    'The bare Electra Model transformer outputting raw hidden-states without any specific head on top. Identical to '
+    'the BERT model except that it uses an additional linear layer between the embedding layer and the encoder if the '
+    'hidden size and embedding size are different. '
+    ''
+    'Both the generator and discriminator checkpoints may be loaded into this model.',
     ELECTRA_START_DOCSTRING,
 )
 class ElectraModel(ElectraPreTrainedModel):
@@ -1108,7 +1244,9 @@ class ElectraModel(ElectraPreTrainedModel):
         self.embeddings = ElectraEmbeddings(config)
 
         if config.embedding_size != config.hidden_size:
-            self.embeddings_project = nn.Linear(config.embedding_size, config.hidden_size)
+            self.embeddings_project = nn.Linear(
+                config.embedding_size, config.hidden_size
+            )
 
         self.encoder = ElectraEncoder(config)
         self.config = config
@@ -1129,7 +1267,9 @@ class ElectraModel(ElectraPreTrainedModel):
         for layer, heads in heads_to_prune.items():
             self.encoder.layer[layer].attention.prune_heads(heads)
 
-    @add_start_docstrings_to_model_forward(ELECTRA_INPUTS_DOCSTRING.format("batch_size, sequence_length"))
+    @add_start_docstrings_to_model_forward(
+        ELECTRA_INPUTS_DOCSTRING.format('batch_size, sequence_length')
+    )
     @add_code_sample_docstrings(
         processor_class=_TOKENIZER_FOR_DOC,
         checkpoint=_CHECKPOINT_FOR_DOC,
@@ -1152,51 +1292,79 @@ class ElectraModel(ElectraPreTrainedModel):
         output_hidden_states: Optional[bool] = None,
         return_dict: Optional[bool] = None,
     ) -> Union[Tuple[torch.Tensor], BaseModelOutputWithCrossAttentions]:
-        output_attentions = output_attentions if output_attentions is not None else self.config.output_attentions
-        output_hidden_states = (
-            output_hidden_states if output_hidden_states is not None else self.config.output_hidden_states
+        output_attentions = (
+            output_attentions
+            if output_attentions is not None
+            else self.config.output_attentions
         )
-        return_dict = return_dict if return_dict is not None else self.config.use_return_dict
+        output_hidden_states = (
+            output_hidden_states
+            if output_hidden_states is not None
+            else self.config.output_hidden_states
+        )
+        return_dict = (
+            return_dict if return_dict is not None else self.config.use_return_dict
+        )
 
         if input_ids is not None and inputs_embeds is not None:
-            raise ValueError("You cannot specify both input_ids and inputs_embeds at the same time")
+            raise ValueError(
+                'You cannot specify both input_ids and inputs_embeds at the same time'
+            )
         elif input_ids is not None:
             input_shape = input_ids.size()
         elif inputs_embeds is not None:
             input_shape = inputs_embeds.size()[:-1]
         else:
-            raise ValueError("You have to specify either input_ids or inputs_embeds")
+            raise ValueError(
+                'You have to specify either input_ids or inputs_embeds')
 
         batch_size, seq_length = input_shape
         device = input_ids.device if input_ids is not None else inputs_embeds.device
 
         # past_key_values_length
-        past_key_values_length = past_key_values[0][0].shape[2] if past_key_values is not None else 0
+        past_key_values_length = (
+            past_key_values[0][0].shape[2] if past_key_values is not None else 0
+        )
 
         if attention_mask is None:
             attention_mask = torch.ones(input_shape, device=device)
         if token_type_ids is None:
-            if hasattr(self.embeddings, "token_type_ids"):
+            if hasattr(self.embeddings, 'token_type_ids'):
                 buffered_token_type_ids = self.embeddings.token_type_ids[:, :seq_length]
-                buffered_token_type_ids_expanded = buffered_token_type_ids.expand(batch_size, seq_length)
+                buffered_token_type_ids_expanded = buffered_token_type_ids.expand(
+                    batch_size, seq_length
+                )
                 token_type_ids = buffered_token_type_ids_expanded
             else:
-                token_type_ids = torch.zeros(input_shape, dtype=torch.long, device=device)
+                token_type_ids = torch.zeros(
+                    input_shape, dtype=torch.long, device=device
+                )
 
-        extended_attention_mask = self.get_extended_attention_mask(attention_mask, input_shape, device=device)
+        extended_attention_mask = self.get_extended_attention_mask(
+            attention_mask, input_shape, device=device
+        )
 
         # If a 2D or 3D attention mask is provided for the cross-attention
         # we need to make broadcastable to [batch_size, num_heads, seq_length, seq_length]
         if self.config.is_decoder and encoder_hidden_states is not None:
-            encoder_batch_size, encoder_sequence_length, _ = encoder_hidden_states.size()
-            encoder_hidden_shape = (encoder_batch_size, encoder_sequence_length)
+            (
+                encoder_batch_size,
+                encoder_sequence_length,
+                _,
+            ) = encoder_hidden_states.size()
+            encoder_hidden_shape = (
+                encoder_batch_size, encoder_sequence_length)
             if encoder_attention_mask is None:
-                encoder_attention_mask = torch.ones(encoder_hidden_shape, device=device)
-            encoder_extended_attention_mask = self.invert_attention_mask(encoder_attention_mask)
+                encoder_attention_mask = torch.ones(
+                    encoder_hidden_shape, device=device)
+            encoder_extended_attention_mask = self.invert_attention_mask(
+                encoder_attention_mask
+            )
         else:
             encoder_extended_attention_mask = None
 
-        head_mask = self.get_head_mask(head_mask, self.config.num_hidden_layers)
+        head_mask = self.get_head_mask(
+            head_mask, self.config.num_hidden_layers)
 
         hidden_states = self.embeddings(
             input_ids=input_ids,
@@ -1206,7 +1374,7 @@ class ElectraModel(ElectraPreTrainedModel):
             past_key_values_length=past_key_values_length,
         )
 
-        if hasattr(self, "embeddings_project"):
+        if hasattr(self, 'embeddings_project'):
             hidden_states = self.embeddings_project(hidden_states)
 
         hidden_states = self.encoder(
@@ -1232,7 +1400,9 @@ class ElectraClassificationHead(nn.Module):
         super().__init__()
         self.dense = nn.Linear(config.hidden_size, config.hidden_size)
         classifier_dropout = (
-            config.classifier_dropout if config.classifier_dropout is not None else config.hidden_dropout_prob
+            config.classifier_dropout
+            if config.classifier_dropout is not None
+            else config.hidden_dropout_prob
         )
         self.dropout = nn.Dropout(classifier_dropout)
         self.out_proj = nn.Linear(config.hidden_size, config.num_labels)
@@ -1241,7 +1411,9 @@ class ElectraClassificationHead(nn.Module):
         x = features[:, 0, :]  # take <s> token (equiv. to [CLS])
         x = self.dropout(x)
         x = self.dense(x)
-        x = get_activation("gelu")(x)  # although BERT uses tanh here, it seems Electra authors used gelu here
+        x = get_activation('gelu')(
+            x
+        )  # although BERT uses tanh here, it seems Electra authors used gelu here
         x = self.dropout(x)
         x = self.out_proj(x)
         return x
@@ -1265,10 +1437,12 @@ class ElectraForSequenceClassification(ElectraPreTrainedModel):
         # Initialize weights and apply final processing
         self.post_init()
 
-    @add_start_docstrings_to_model_forward(ELECTRA_INPUTS_DOCSTRING.format("batch_size, sequence_length"))
+    @add_start_docstrings_to_model_forward(
+        ELECTRA_INPUTS_DOCSTRING.format('batch_size, sequence_length')
+    )
     @add_code_sample_docstrings(
         processor_class=_TOKENIZER_FOR_DOC,
-        checkpoint="bhadresh-savani/electra-base-emotion",
+        checkpoint='bhadresh-savani/electra-base-emotion',
         output_type=SequenceClassifierOutput,
         config_class=_CONFIG_FOR_DOC,
         expected_output="'joy'",
@@ -1293,7 +1467,9 @@ class ElectraForSequenceClassification(ElectraPreTrainedModel):
             config.num_labels - 1]`. If `config.num_labels == 1` a regression loss is computed (Mean-Square loss), If
             `config.num_labels > 1` a classification loss is computed (Cross-Entropy).
         """
-        return_dict = return_dict if return_dict is not None else self.config.use_return_dict
+        return_dict = (
+            return_dict if return_dict is not None else self.config.use_return_dict
+        )
 
         discriminator_hidden_states = self.electra(
             input_ids,
@@ -1314,22 +1490,25 @@ class ElectraForSequenceClassification(ElectraPreTrainedModel):
         if labels is not None:
             if self.config.problem_type is None:
                 if self.num_labels == 1:
-                    self.config.problem_type = "regression"
-                elif self.num_labels > 1 and (labels.dtype == torch.long or labels.dtype == torch.int):
-                    self.config.problem_type = "single_label_classification"
+                    self.config.problem_type = 'regression'
+                elif self.num_labels > 1 and (
+                    labels.dtype == torch.long or labels.dtype == torch.int
+                ):
+                    self.config.problem_type = 'single_label_classification'
                 else:
-                    self.config.problem_type = "multi_label_classification"
+                    self.config.problem_type = 'multi_label_classification'
 
-            if self.config.problem_type == "regression":
+            if self.config.problem_type == 'regression':
                 loss_fct = MSELoss()
                 if self.num_labels == 1:
                     loss = loss_fct(logits.squeeze(), labels.squeeze())
                 else:
                     loss = loss_fct(logits, labels)
-            elif self.config.problem_type == "single_label_classification":
+            elif self.config.problem_type == 'single_label_classification':
                 loss_fct = CrossEntropyLoss()
-                loss = loss_fct(logits.view(-1, self.num_labels), labels.view(-1))
-            elif self.config.problem_type == "multi_label_classification":
+                loss = loss_fct(
+                    logits.view(-1, self.num_labels), labels.view(-1))
+            elif self.config.problem_type == 'multi_label_classification':
                 loss_fct = BCEWithLogitsLoss()
                 loss = loss_fct(logits, labels)
 
@@ -1358,12 +1537,17 @@ class ElectraForPreTraining(ElectraPreTrainedModel):
         super().__init__(config)
 
         self.electra = ElectraModel(config)
-        self.discriminator_predictions = ElectraDiscriminatorPredictions(config)
+        self.discriminator_predictions = ElectraDiscriminatorPredictions(
+            config)
         # Initialize weights and apply final processing
         self.post_init()
 
-    @add_start_docstrings_to_model_forward(ELECTRA_INPUTS_DOCSTRING.format("batch_size, sequence_length"))
-    @replace_return_docstrings(output_type=ElectraForPreTrainingOutput, config_class=_CONFIG_FOR_DOC)
+    @add_start_docstrings_to_model_forward(
+        ELECTRA_INPUTS_DOCSTRING.format('batch_size, sequence_length')
+    )
+    @replace_return_docstrings(
+        output_type=ElectraForPreTrainingOutput, config_class=_CONFIG_FOR_DOC
+    )
     def forward(
         self,
         input_ids: Optional[torch.Tensor] = None,
@@ -1410,7 +1594,9 @@ class ElectraForPreTraining(ElectraPreTrainedModel):
         >>> predictions.squeeze().tolist()
         [0.0, 0.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 0.0, 0.0]
         ```"""
-        return_dict = return_dict if return_dict is not None else self.config.use_return_dict
+        return_dict = (
+            return_dict if return_dict is not None else self.config.use_return_dict
+        )
 
         discriminator_hidden_states = self.electra(
             input_ids,
@@ -1431,12 +1617,20 @@ class ElectraForPreTraining(ElectraPreTrainedModel):
         if labels is not None:
             loss_fct = nn.BCEWithLogitsLoss()
             if attention_mask is not None:
-                active_loss = attention_mask.view(-1, discriminator_sequence_output.shape[1]) == 1
-                active_logits = logits.view(-1, discriminator_sequence_output.shape[1])[active_loss]
+                active_loss = (
+                    attention_mask.view(-1,
+                                        discriminator_sequence_output.shape[1]) == 1
+                )
+                active_logits = logits.view(-1, discriminator_sequence_output.shape[1])[
+                    active_loss
+                ]
                 active_labels = labels[active_loss]
                 loss = loss_fct(active_logits, active_labels.float())
             else:
-                loss = loss_fct(logits.view(-1, discriminator_sequence_output.shape[1]), labels.float())
+                loss = loss_fct(
+                    logits.view(-1, discriminator_sequence_output.shape[1]),
+                    labels.float(),
+                )
 
         if not return_dict:
             output = (logits,) + discriminator_hidden_states[1:]
@@ -1466,7 +1660,8 @@ class ElectraForMaskedLM(ElectraPreTrainedModel):
         self.electra = ElectraModel(config)
         self.generator_predictions = ElectraGeneratorPredictions(config)
 
-        self.generator_lm_head = nn.Linear(config.embedding_size, config.vocab_size)
+        self.generator_lm_head = nn.Linear(
+            config.embedding_size, config.vocab_size)
         # Initialize weights and apply final processing
         self.post_init()
 
@@ -1476,13 +1671,15 @@ class ElectraForMaskedLM(ElectraPreTrainedModel):
     def set_output_embeddings(self, word_embeddings):
         self.generator_lm_head = word_embeddings
 
-    @add_start_docstrings_to_model_forward(ELECTRA_INPUTS_DOCSTRING.format("batch_size, sequence_length"))
+    @add_start_docstrings_to_model_forward(
+        ELECTRA_INPUTS_DOCSTRING.format('batch_size, sequence_length')
+    )
     @add_code_sample_docstrings(
         processor_class=_TOKENIZER_FOR_DOC,
-        checkpoint="google/electra-small-generator",
+        checkpoint='google/electra-small-generator',
         output_type=MaskedLMOutput,
         config_class=_CONFIG_FOR_DOC,
-        mask="[MASK]",
+        mask='[MASK]',
         expected_output="'paris'",
         expected_loss=1.22,
     )
@@ -1505,7 +1702,9 @@ class ElectraForMaskedLM(ElectraPreTrainedModel):
             config.vocab_size]` (see `input_ids` docstring) Tokens with indices set to `-100` are ignored (masked), the
             loss is only computed for the tokens with labels in `[0, ..., config.vocab_size]`
         """
-        return_dict = return_dict if return_dict is not None else self.config.use_return_dict
+        return_dict = (
+            return_dict if return_dict is not None else self.config.use_return_dict
+        )
 
         generator_hidden_states = self.electra(
             input_ids,
@@ -1520,14 +1719,18 @@ class ElectraForMaskedLM(ElectraPreTrainedModel):
         )
         generator_sequence_output = generator_hidden_states[0]
 
-        prediction_scores = self.generator_predictions(generator_sequence_output)
+        prediction_scores = self.generator_predictions(
+            generator_sequence_output)
         prediction_scores = self.generator_lm_head(prediction_scores)
 
         loss = None
         # Masked language modeling softmax layer
         if labels is not None:
             loss_fct = nn.CrossEntropyLoss()  # -100 index = padding token
-            loss = loss_fct(prediction_scores.view(-1, self.config.vocab_size), labels.view(-1))
+            loss = loss_fct(
+                prediction_scores.view(-1,
+                                       self.config.vocab_size), labels.view(-1)
+            )
 
         if not return_dict:
             output = (prediction_scores,) + generator_hidden_states[1:]
@@ -1556,17 +1759,21 @@ class ElectraForTokenClassification(ElectraPreTrainedModel):
 
         self.electra = ElectraModel(config)
         classifier_dropout = (
-            config.classifier_dropout if config.classifier_dropout is not None else config.hidden_dropout_prob
+            config.classifier_dropout
+            if config.classifier_dropout is not None
+            else config.hidden_dropout_prob
         )
         self.dropout = nn.Dropout(classifier_dropout)
         self.classifier = nn.Linear(config.hidden_size, config.num_labels)
         # Initialize weights and apply final processing
         self.post_init()
 
-    @add_start_docstrings_to_model_forward(ELECTRA_INPUTS_DOCSTRING.format("batch_size, sequence_length"))
+    @add_start_docstrings_to_model_forward(
+        ELECTRA_INPUTS_DOCSTRING.format('batch_size, sequence_length')
+    )
     @add_code_sample_docstrings(
         processor_class=_TOKENIZER_FOR_DOC,
-        checkpoint="bhadresh-savani/electra-base-discriminator-finetuned-conll03-english",
+        checkpoint='bhadresh-savani/electra-base-discriminator-finetuned-conll03-english',
         output_type=TokenClassifierOutput,
         config_class=_CONFIG_FOR_DOC,
         expected_output="['B-LOC', 'B-ORG', 'O', 'O', 'O', 'O', 'O', 'B-LOC', 'O', 'B-LOC', 'I-LOC']",
@@ -1589,7 +1796,9 @@ class ElectraForTokenClassification(ElectraPreTrainedModel):
         labels (`torch.LongTensor` of shape `(batch_size, sequence_length)`, *optional*):
             Labels for computing the token classification loss. Indices should be in `[0, ..., config.num_labels - 1]`.
         """
-        return_dict = return_dict if return_dict is not None else self.config.use_return_dict
+        return_dict = (
+            return_dict if return_dict is not None else self.config.use_return_dict
+        )
 
         discriminator_hidden_states = self.electra(
             input_ids,
@@ -1604,7 +1813,8 @@ class ElectraForTokenClassification(ElectraPreTrainedModel):
         )
         discriminator_sequence_output = discriminator_hidden_states[0]
 
-        discriminator_sequence_output = self.dropout(discriminator_sequence_output)
+        discriminator_sequence_output = self.dropout(
+            discriminator_sequence_output)
         logits = self.classifier(discriminator_sequence_output)
 
         loss = None
@@ -1633,7 +1843,7 @@ class ElectraForTokenClassification(ElectraPreTrainedModel):
 )
 class ElectraForQuestionAnswering(ElectraPreTrainedModel):
     config_class = ElectraConfig
-    base_model_prefix = "electra"
+    base_model_prefix = 'electra'
 
     def __init__(self, config):
         super().__init__(config)
@@ -1645,7 +1855,9 @@ class ElectraForQuestionAnswering(ElectraPreTrainedModel):
         # Initialize weights and apply final processing
         self.post_init()
 
-    @add_start_docstrings_to_model_forward(ELECTRA_INPUTS_DOCSTRING.format("batch_size, sequence_length"))
+    @add_start_docstrings_to_model_forward(
+        ELECTRA_INPUTS_DOCSTRING.format('batch_size, sequence_length')
+    )
     def forward(
         self,
         input_ids: Optional[torch.Tensor] = None,
@@ -1670,7 +1882,9 @@ class ElectraForQuestionAnswering(ElectraPreTrainedModel):
             Positions are clamped to the length of the sequence (`sequence_length`). Position outside of the sequence
             are not taken into account for computing the loss.
         """
-        return_dict = return_dict if return_dict is not None else self.config.use_return_dict
+        return_dict = (
+            return_dict if return_dict is not None else self.config.use_return_dict
+        )
 
         discriminator_hidden_states = self.electra(
             input_ids,
@@ -1741,7 +1955,10 @@ class ElectraForMultipleChoice(ElectraPreTrainedModel):
         # Initialize weights and apply final processing
         self.post_init()
 
-    @add_start_docstrings_to_model_forward(ELECTRA_INPUTS_DOCSTRING.format("batch_size, num_choices, sequence_length"))
+    @add_start_docstrings_to_model_forward(
+        ELECTRA_INPUTS_DOCSTRING.format(
+            'batch_size, num_choices, sequence_length')
+    )
     @add_code_sample_docstrings(
         processor_class=_TOKENIZER_FOR_DOC,
         checkpoint=_CHECKPOINT_FOR_DOC,
@@ -1767,15 +1984,35 @@ class ElectraForMultipleChoice(ElectraPreTrainedModel):
             num_choices-1]` where `num_choices` is the size of the second dimension of the input tensors. (See
             `input_ids` above)
         """
-        return_dict = return_dict if return_dict is not None else self.config.use_return_dict
-        num_choices = input_ids.shape[1] if input_ids is not None else inputs_embeds.shape[1]
+        return_dict = (
+            return_dict if return_dict is not None else self.config.use_return_dict
+        )
+        num_choices = (
+            input_ids.shape[1] if input_ids is not None else inputs_embeds.shape[1]
+        )
 
-        input_ids = input_ids.view(-1, input_ids.size(-1)) if input_ids is not None else None
-        attention_mask = attention_mask.view(-1, attention_mask.size(-1)) if attention_mask is not None else None
-        token_type_ids = token_type_ids.view(-1, token_type_ids.size(-1)) if token_type_ids is not None else None
-        position_ids = position_ids.view(-1, position_ids.size(-1)) if position_ids is not None else None
+        input_ids = (
+            input_ids.view(-1, input_ids.size(-1)
+                           ) if input_ids is not None else None
+        )
+        attention_mask = (
+            attention_mask.view(-1, attention_mask.size(-1))
+            if attention_mask is not None
+            else None
+        )
+        token_type_ids = (
+            token_type_ids.view(-1, token_type_ids.size(-1))
+            if token_type_ids is not None
+            else None
+        )
+        position_ids = (
+            position_ids.view(-1, position_ids.size(-1))
+            if position_ids is not None
+            else None
+        )
         inputs_embeds = (
-            inputs_embeds.view(-1, inputs_embeds.size(-2), inputs_embeds.size(-1))
+            inputs_embeds.view(-1, inputs_embeds.size(-2),
+                               inputs_embeds.size(-1))
             if inputs_embeds is not None
             else None
         )
@@ -1816,18 +2053,22 @@ class ElectraForMultipleChoice(ElectraPreTrainedModel):
 
 
 @add_start_docstrings(
-    """ELECTRA Model with a `language modeling` head on top for CLM fine-tuning.""", ELECTRA_START_DOCSTRING
+    """ELECTRA Model with a `language modeling` head on top for CLM fine-tuning.""",
+    ELECTRA_START_DOCSTRING,
 )
 class ElectraForCausalLM(ElectraPreTrainedModel):
     def __init__(self, config):
         super().__init__(config)
 
         if not config.is_decoder:
-            logger.warning("If you want to use `ElectraForCausalLM` as a standalone, add `is_decoder=True.`")
+            logger.warning(
+                'If you want to use `ElectraForCausalLM` as a standalone, add `is_decoder=True.`'
+            )
 
         self.electra = ElectraModel(config)
         self.generator_predictions = ElectraGeneratorPredictions(config)
-        self.generator_lm_head = nn.Linear(config.embedding_size, config.vocab_size)
+        self.generator_lm_head = nn.Linear(
+            config.embedding_size, config.vocab_size)
 
         self.init_weights()
 
@@ -1837,8 +2078,12 @@ class ElectraForCausalLM(ElectraPreTrainedModel):
     def set_output_embeddings(self, new_embeddings):
         self.generator_lm_head = new_embeddings
 
-    @add_start_docstrings_to_model_forward(ELECTRA_INPUTS_DOCSTRING.format("batch_size, sequence_length"))
-    @replace_return_docstrings(output_type=CausalLMOutputWithCrossAttentions, config_class=_CONFIG_FOR_DOC)
+    @add_start_docstrings_to_model_forward(
+        ELECTRA_INPUTS_DOCSTRING.format('batch_size, sequence_length')
+    )
+    @replace_return_docstrings(
+        output_type=CausalLMOutputWithCrossAttentions, config_class=_CONFIG_FOR_DOC
+    )
     def forward(
         self,
         input_ids: Optional[torch.Tensor] = None,
@@ -1899,7 +2144,9 @@ class ElectraForCausalLM(ElectraPreTrainedModel):
 
         >>> prediction_logits = outputs.logits
         ```"""
-        return_dict = return_dict if return_dict is not None else self.config.use_return_dict
+        return_dict = (
+            return_dict if return_dict is not None else self.config.use_return_dict
+        )
         if labels is not None:
             use_cache = False
 
@@ -1920,15 +2167,21 @@ class ElectraForCausalLM(ElectraPreTrainedModel):
         )
 
         sequence_output = outputs[0]
-        prediction_scores = self.generator_lm_head(self.generator_predictions(sequence_output))
+        prediction_scores = self.generator_lm_head(
+            self.generator_predictions(sequence_output)
+        )
 
         lm_loss = None
         if labels is not None:
             # we are doing next-token prediction; shift prediction scores and input ids by one
-            shifted_prediction_scores = prediction_scores[:, :-1, :].contiguous()
+            shifted_prediction_scores = prediction_scores[:,
+                                                          :-1, :].contiguous()
             labels = labels[:, 1:].contiguous()
             loss_fct = CrossEntropyLoss()
-            lm_loss = loss_fct(shifted_prediction_scores.view(-1, self.config.vocab_size), labels.view(-1))
+            lm_loss = loss_fct(
+                shifted_prediction_scores.view(-1, self.config.vocab_size),
+                labels.view(-1),
+            )
 
         if not return_dict:
             output = (prediction_scores,) + outputs[1:]
@@ -1944,7 +2197,9 @@ class ElectraForCausalLM(ElectraPreTrainedModel):
         )
 
     # Copied from transformers.models.roberta.modeling_roberta.RobertaForCausalLM.prepare_inputs_for_generation
-    def prepare_inputs_for_generation(self, input_ids, past=None, attention_mask=None, **model_kwargs):
+    def prepare_inputs_for_generation(
+        self, input_ids, past=None, attention_mask=None, **model_kwargs
+    ):
         input_shape = input_ids.shape
         # if model is used as a decoder in encoder-decoder model, the decoder attention mask is created on the fly
         if attention_mask is None:
@@ -1954,11 +2209,19 @@ class ElectraForCausalLM(ElectraPreTrainedModel):
         if past is not None:
             input_ids = input_ids[:, -1:]
 
-        return {"input_ids": input_ids, "attention_mask": attention_mask, "past_key_values": past}
+        return {
+            'input_ids': input_ids,
+            'attention_mask': attention_mask,
+            'past_key_values': past,
+        }
 
     # Copied from transformers.models.roberta.modeling_roberta.RobertaForCausalLM._reorder_cache
     def _reorder_cache(self, past, beam_idx):
         reordered_past = ()
         for layer_past in past:
-            reordered_past += (tuple(past_state.index_select(0, beam_idx) for past_state in layer_past),)
+            reordered_past += (
+                tuple(
+                    past_state.index_select(0, beam_idx) for past_state in layer_past
+                ),
+            )
         return reordered_past

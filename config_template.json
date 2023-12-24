@@ -2,7 +2,7 @@
     "id": 0,
     "is_running": false,
     "completed": false,
-    "time_to_train": 0, 
+    "time_to_train": 0,
     "scores": {
         "cola": 0,
         "mnli": 0,
@@ -13,7 +13,7 @@
         "sst": 0,
         "sts": 0,
         "glue": 0
-    }, 
+    },
     "hparams": {
         "use_tpu": true,
         "num_tpu_cores": 8,

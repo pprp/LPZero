@@ -1,4 +1,5 @@
-import torch 
+import torch
+
 
 # Activation Distance metric
 def activation_distance(outputs):
@@ -9,9 +10,9 @@ def activation_distance(outputs):
         K = x @ x.t()
         K2 = (1.0 - x) @ (1.0 - x.t())
         metric_array.append(K + K2)
-        
+
     summed = torch.tensor(0.0)
     for j in range(len(outputs)):
         summed += torch.nansum(metric_array[j])
-    
+
     return summed.detach().item()

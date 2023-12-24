@@ -1,5 +1,7 @@
-import torch 
+import torch
+
 from lpzero.model.flexibert.modeling_electra import ElectraLayer
+
 
 def synaptic_saliency_normalized(model):
     metric_array = []
@@ -15,10 +17,10 @@ def synaptic_saliency_normalized(model):
                     metric_array.append(
                         torch.abs(sublayer.weight * sublayer.weight.grad)
                     )
-                    
+
     summed = torch.tensor(0.0)
     for j in range(len(metric_array)):
         summed += torch.nansum(metric_array[j])
     summed /= len(metric_array)
-        
+
     return summed.detach().item()

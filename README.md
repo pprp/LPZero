@@ -9,7 +9,7 @@ Neural architecture search (NAS) has allowed for the automatic creation of new a
 
 All dataset files and training-free metric results are in [`data/`](data/). The NAS-Bench-BERT benchmark is described in [`data/BERT_benchmark.json`](data/BERT_benchmark.json).
 
-Required packages are listed in [`requirements.txt`](requirements.txt), and can be installed with `pip install -r requirements.txt`. The Docker file used to define the MacOS container in which code was run is also included. 
+Required packages are listed in [`requirements.txt`](requirements.txt), and can be installed with `pip install -r requirements.txt`. The Docker file used to define the MacOS container in which code was run is also included.
 
 Run [`BERT_metrics.ipyb`](BERT_metrics.ipynb) and [`RNN_metrics.ipyb`](BERT_metrics.ipynb) to reproduce results, and [`BERT_stats.ipyb`](BERT_stats.ipynb) and [`RNN_stats.ipyb`](RNN_stats.ipynb) to create figures.
 

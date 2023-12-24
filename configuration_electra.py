@@ -16,7 +16,6 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-
 from collections import OrderedDict
 from typing import Mapping
 
@@ -24,21 +23,20 @@ from transformers.configuration_utils import PretrainedConfig
 from transformers.onnx import OnnxConfig
 from transformers.utils import logging
 
-
 logger = logging.get_logger(__name__)
 
 ELECTRA_PRETRAINED_CONFIG_ARCHIVE_MAP = {
-    "google/electra-small-generator": "https://huggingface.co/google/electra-small-generator/resolve/main/config.json",
-    "google/electra-base-generator": "https://huggingface.co/google/electra-base-generator/resolve/main/config.json",
-    "google/electra-large-generator": "https://huggingface.co/google/electra-large-generator/resolve/main/config.json",
-    "google/electra-small-discriminator": (
-        "https://huggingface.co/google/electra-small-discriminator/resolve/main/config.json"
+    'google/electra-small-generator': 'https://huggingface.co/google/electra-small-generator/resolve/main/config.json',
+    'google/electra-base-generator': 'https://huggingface.co/google/electra-base-generator/resolve/main/config.json',
+    'google/electra-large-generator': 'https://huggingface.co/google/electra-large-generator/resolve/main/config.json',
+    'google/electra-small-discriminator': (
+        'https://huggingface.co/google/electra-small-discriminator/resolve/main/config.json'
     ),
-    "google/electra-base-discriminator": (
-        "https://huggingface.co/google/electra-base-discriminator/resolve/main/config.json"
+    'google/electra-base-discriminator': (
+        'https://huggingface.co/google/electra-base-discriminator/resolve/main/config.json'
     ),
-    "google/electra-large-discriminator": (
-        "https://huggingface.co/google/electra-large-discriminator/resolve/main/config.json"
+    'google/electra-large-discriminator': (
+        'https://huggingface.co/google/electra-large-discriminator/resolve/main/config.json'
     ),
 }
 
@@ -135,7 +133,7 @@ class ElectraConfig(PretrainedConfig):
     >>> # Accessing the model configuration
     >>> configuration = model.config
     ```"""
-    model_type = "electra"
+    model_type = 'electra'
 
     def __init__(
         self,
@@ -145,16 +143,16 @@ class ElectraConfig(PretrainedConfig):
         num_hidden_layers=4,
         num_attention_heads=4,
         intermediate_size=1024,
-        hidden_act="gelu",
+        hidden_act='gelu',
         hidden_dropout_prob=0.1,
         attention_probs_dropout_prob=0.1,
         max_position_embeddings=512,
         type_vocab_size=2,
         initializer_range=0.02,
         layer_norm_eps=1e-12,
-        summary_type="first",
+        summary_type='first',
         summary_use_proj=True,
-        summary_activation="gelu",
+        summary_activation='gelu',
         summary_last_dropout=0.1,
         pad_token_id=0,
         use_cache=True,
@@ -192,14 +190,14 @@ class ElectraConfig(PretrainedConfig):
 class ElectraOnnxConfig(OnnxConfig):
     @property
     def inputs(self) -> Mapping[str, Mapping[int, str]]:
-        if self.task == "multiple-choice":
-            dynamic_axis = {0: "batch", 1: "choice", 2: "sequence"}
+        if self.task == 'multiple-choice':
+            dynamic_axis = {0: 'batch', 1: 'choice', 2: 'sequence'}
         else:
-            dynamic_axis = {0: "batch", 1: "sequence"}
+            dynamic_axis = {0: 'batch', 1: 'sequence'}
         return OrderedDict(
             [
-                ("input_ids", dynamic_axis),
-                ("attention_mask", dynamic_axis),
-                ("token_type_ids", dynamic_axis),
+                ('input_ids', dynamic_axis),
+                ('attention_mask', dynamic_axis),
+                ('token_type_ids', dynamic_axis),
             ]
         )
