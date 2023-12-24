@@ -5,6 +5,7 @@ import numpy as np
 import torch
 from datasets import load_dataset
 from scipy.stats import kendalltau, pearsonr
+from lpzero.predictor.measures import *  # noqa: F403
 
 from lpzero.model.flexibert.modeling_electra import (
     ElectraConfig,
@@ -46,7 +47,7 @@ def generate_inputs():
 
 
 # generate model BERT
-def generate_bert():
+def generate_bert(inputs):
     # Run metrics on all model in benchmark
     with open('BERT_initialization_ablation.csv', 'a') as f:
         writer = csv.writer(f)
@@ -154,10 +155,10 @@ def generate_bert():
                 num_parameters(model),
                 head_importance(model),
                 head_importance_normalized(model),
-                attention_condfidence(head_outputs),
-                attention_condfidence_normalized(head_outputs),
-                attention_condfidence(softmax_outputs),
-                attention_condfidence_normalized(softmax_outputs),
+                attention_confidence(head_outputs),
+                attention_confidence_normalized(head_outputs),
+                attention_confidence(softmax_outputs),
+                attention_confidence_normalized(softmax_outputs),
             ]
 
             writer.writerow(row)
@@ -169,3 +170,9 @@ def generate_bert():
 # predict the score of each candidate answer
 
 # calculate the rank consistency
+
+
+
+if __name__ == '__main__':
+    inputs = generate_inputs()
+    generate_bert(inputs)

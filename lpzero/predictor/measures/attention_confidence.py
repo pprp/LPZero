@@ -2,7 +2,7 @@ import torch
 
 
 # Attention Confidence metric (for both head and softmax)
-def attention_condfidence(outputs):
+def attention_confidence(outputs):
     metric_array = []
     for output in outputs:
         metric_array.append(torch.mean(torch.max(output, 1)[0]))
@@ -14,7 +14,7 @@ def attention_condfidence(outputs):
     return summed.detach().item()
 
 
-def attention_condfidence_normalized(outputs):
+def attention_confidence_normalized(outputs):
     metric_array = []
     for output in outputs:
         metric_array.append(torch.mean(torch.max(output, 1)[0]))
