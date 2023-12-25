@@ -30,7 +30,7 @@ with open('./data/BERT_benchmark.json', 'r') as f:
 
 
 logger.add(
-    'info.log',
+    'logs/evoluion_serach.log',
     format='{time:YYYY-MM-DD HH:mm:ss} | {level} | {module}:{function}:{line} - {message}',
     level='INFO',
 )

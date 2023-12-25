@@ -1,3 +1,5 @@
 nas-bench-nlp-release/
 *.pyc
 plzero.egg-info/*
+logs/*
+*.log
