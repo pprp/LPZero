@@ -16,6 +16,8 @@ configs = []
 with open('./data/BERT_benchmark.json', 'r') as f:
     configs = json.load(f)
 
+i = 0
+
 nas_config = configs[i]['hparams']['model_hparam_overrides']['nas_config']
 
 gt = configs[i]['scores']['glue']
@@ -34,4 +36,4 @@ tree = TreeStructure()
 
 out = tree.forward_tree(inputs, model)
 
-print(out.shape)
+print(out)

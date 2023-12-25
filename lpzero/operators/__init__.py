@@ -11,19 +11,19 @@ _zc_candidates_impls = {}
 
 def zc_candidates(name, bn=True, copy_net=True, force_clean=True, **impl_args):
     def make_impl(func):
-        def zc_candidates_impl(net, device, *args, **kwargs):
+        def zc_candidates_impl(model, device, *args, **kwargs):
             if copy_net:
-                net = copy.copy(net)
+                model = copy.copy(model)
                 # net_orig.get_prunable_copy(bn=bn).to(device)
             else:
-                net = net
-            ret = func(net, *args, **kwargs, **impl_args)
+                model = model
+            ret = func(model, *args, **kwargs, **impl_args)
             if copy_net and force_clean:
                 import gc
 
                 import torch
 
-                del net
+                del model
                 torch.cuda.empty_cache()
                 gc.collect()
             return ret
@@ -38,11 +38,8 @@ def zc_candidates(name, bn=True, copy_net=True, force_clean=True, **impl_args):
     return make_impl
 
 
-def get_zc_candidates(name, net, device, *args, **kwargs):
-    # a = torch.cuda.memory_allocated(device=torch.device('cuda:0'))
-    results = _zc_candidates_impls[name](net, device, *args, **kwargs)
-    # b = torch.cuda.memory_allocated(device=torch.device('cuda:0'))
-    # print("Memory allocated: ", b - a, " bytes")
+def get_zc_candidates(name, model, device, *args, **kwargs):
+    results = _zc_candidates_impls[name](model, device, *args, **kwargs)
 
     # force clean
     import gc
@@ -59,10 +56,10 @@ def get_zc_function(name):
 
 def load_all():
     # from .zc_inputs import compute_hessian  # noqa: F401
+    from .zc_inputs import compute_jacobs # noqa: F401
     from .zc_inputs import compute_activation  # noqa: F401
+    from .zc_inputs import compute_head  # noqa: F401
+    from .zc_inputs import compute_softmax  # noqa: F401
     from .zc_inputs import compute_gradient  # noqa: F401
-    from .zc_inputs import compute_virtual_grad  # noqa: F401
     from .zc_inputs import compute_weight  # noqa: F401
-
-
 load_all()

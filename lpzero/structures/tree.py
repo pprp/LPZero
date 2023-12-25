@@ -76,10 +76,8 @@ class TreeStructure(BaseStructure):
         self._repr_geno = repr_geno
 
     def forward_tree(self, inputs, model, return_all=False):
-        if torch.cuda.is_available():
-            inputs=inputs.cuda()
         try:
-            # if True:
+        # if True:
             A1, A2 = self._genotype['input_geno']
             A1 = get_zc_candidates(
                 self._genotype['input_geno'][0],
@@ -126,108 +124,6 @@ class TreeStructure(BaseStructure):
             return A, convert_to_float(A)
         else:
             return convert_to_float(A)
-
-    def forward_structure(self, inputs, model, structure_info: list):
-        if torch.cuda.is_available():
-            inputs=inputs.cuda()
-        # if True:
-        try:
-            A1, A2 = self._genotype['input_geno']
-            A1 = get_zc_candidates(
-                self._genotype['input_geno'][0],
-                model,
-                device=torch.device(
-                    'cuda' if torch.cuda.is_available() else 'cpu'),
-                inputs=inputs,
-                loss_fn=nn.CrossEntropyLoss(),
-            )
-            A2 = get_zc_candidates(
-                self._genotype['input_geno'][1],
-                model,
-                device=torch.device(
-                    'cuda' if torch.cuda.is_available() else 'cpu'),
-                inputs=inputs,
-                loss_fn=nn.CrossEntropyLoss(),
-            )
-
-            # process input1 with two unary operations
-            struct_list = model.get_struct_list(structure_info)
-
-            A1 = [a * b for a, b in zip(A1, struct_list)]
-
-            A1 = [unary_operation(a, self._genotype['op_geno'][0][0])
-                  for a in A1]
-            A1 = [unary_operation(a, self._genotype['op_geno'][0][1])
-                  for a in A1]
-
-            # process input2 with two unary operations
-            A2 = [a * b for a, b in zip(A2, struct_list)]
-            A2 = [unary_operation(a, self._genotype['op_geno'][1][0])
-                  for a in A2]
-            A2 = [unary_operation(a, self._genotype['op_geno'][1][1])
-                  for a in A2]
-
-            # process binary operation
-            A = []
-            for a1, a2 in zip(A1, A2):
-                a1 = convert_to_float(a1)
-                a2 = convert_to_float(a2)
-                A.append(binary_operation(
-                    a1, a2, self._genotype['op_geno'][2]))
-
-        except Exception as e:
-            print('GOT ERROR in TREE STRUCTURE:', e)
-            return -1
-
-        return convert_to_float(A)
-
-    def forward_save(self, inputs, model):
-        if torch.cuda.is_available():
-            inputs = inputs.cuda()
-        try:
-            A1, A2 = self._genotype['input_geno']
-            A1 = get_zc_candidates(
-                self._genotype['input_geno'][0],
-                model,
-                device=torch.device(
-                    'cuda' if torch.cuda.is_available() else 'cpu'),
-                inputs=inputs,
-                loss_fn=nn.CrossEntropyLoss(),
-            )
-            A2 = get_zc_candidates(
-                self._genotype['input_geno'][1],
-                model,
-                device=torch.device(
-                    'cuda' if torch.cuda.is_available() else 'cpu'),
-                inputs=inputs,
-                loss_fn=nn.CrossEntropyLoss(),
-            )
-
-            # process input1 with two unary operations
-            A1 = [unary_operation(a, self._genotype['op_geno'][0][0])
-                  for a in A1]
-            A1 = [unary_operation(a, self._genotype['op_geno'][0][1])
-                  for a in A1]
-
-            # process input2 with two unary operations
-            A2 = [unary_operation(a, self._genotype['op_geno'][1][0])
-                  for a in A2]
-            A2 = [unary_operation(a, self._genotype['op_geno'][1][1])
-                  for a in A2]
-
-            # process binary operation
-            A = []
-            for a1, a2 in zip(A1, A2):
-                a1 = convert_to_float(a1)
-                a2 = convert_to_float(a2)
-                A.append(binary_operation(
-                    a1, a2, self._genotype['op_geno'][2]))
-
-        except Exception as e:
-            print('GOT ERROR in TREE STRUCTURE:', e)
-            return -1
-
-        return A
 
     def __call__(self, inputs, model, return_all=False):
         return self.forward_tree(inputs, model, return_all=return_all)
