@@ -3,3 +3,5 @@ nas-bench-nlp-release/
 plzero.egg-info/*
 logs/*
 *.log
+output/*
+

@@ -66,7 +66,6 @@ class TreeStructure(BaseStructure):
 
         # for binary operation
         binaryx1 = sample_binary_key_by_prob()
-        print('binaryx1', binaryx1)
         repr_geno += f'BINARY:({BINARY_KEYS[binaryx1]})'
         geno.append(binaryx1)
 

@@ -29,8 +29,61 @@ with open('./data/BERT_benchmark.json', 'r') as f:
     configs = json.load(f)
 
 
+def parse_args():
+    parser = argparse.ArgumentParser(
+        description='running parameters',
+        formatter_class=argparse.ArgumentDefaultsHelpFormatter,
+    )
+
+    # general parameters for data and qnn
+    parser.add_argument(
+        '--seed', default=42, type=int, help='random seed for results reproduction'
+    )
+    parser.add_argument(
+        '--step', default=20, type=int, help='record snn output per step'
+    )
+
+    parser.add_argument(
+        '--iterations', default=1000, type=int, help='number of iteration for LSQ'
+    )
+    # search space structure
+    parser.add_argument(
+        '--search_structure',
+        default='tree',
+        type=str,
+        help='search space structure, linear, tree or graph',
+    )
+
+    # popu size
+    parser.add_argument(
+        '--popu_size',
+        default=80,
+        type=int,
+        help='population size should be larger than 10',
+    )
+    
+    # log path 
+    parser.add_argument(
+        '--log_path',
+        default='./logs/evo_search_run0.log',
+        type=str,
+        help='path of log',
+    )
+    # num_sample
+    parser.add_argument(
+        '--num_sample',
+        default=50, 
+        type=int, 
+        help='number of sample to be evaluate the ranking consistency',
+    )
+
+    args = parser.parse_args()
+    return args 
+
+args = parse_args()
+
 logger.add(
-    'logs/evoluion_serach.log',
+    args.log_path,
     format='{time:YYYY-MM-DD HH:mm:ss} | {level} | {module}:{function}:{line} - {message}',
     level='INFO',
 )
@@ -40,8 +93,10 @@ def all_same(items):
     return all(x == items[0] for x in items)
 
 
-def fitness_spearman(dataiter, structure, inputs, device, num_sample=50):
+def fitness_spearman(inputs, structure, device=None, num_sample=50):
     """structure is belong to popultion."""
+    device = device or torch.device(
+        'cuda' if torch.cuda.is_available() else 'cpu')
     if structure.sp_score != -1:
         return structure.sp_score
 
@@ -115,14 +170,14 @@ def is_anomaly(zc_score: Union[torch.Tensor, float, int] = None) -> bool:
     return False
 
 
-def evolution_search(dataiter, structure, iterations=1000, popu_size=50):
+def evolution_search(inputs, structure, iterations=1000, popu_size=50):
     # random initialize N structures for evolution
     population = []
     logger.info('Initialize population')
 
     while len(population) < popu_size:
         struct = structure()
-        score = fitness_spearman(dataiter, struct)
+        score = fitness_spearman(inputs, struct, num_sample=args.num_sample)
         if is_anomaly(score):
             continue
         logger.info(f'Current population size: {len(population)}')
@@ -135,7 +190,7 @@ def evolution_search(dataiter, structure, iterations=1000, popu_size=50):
     # run the cycle
     logger.info('Begin the evolution process...')
     for i in range(iterations):
-        scores = [fitness_spearman(dataiter, struct) for struct in population]
+        scores = [fitness_spearman(inputs, struct, num_sample=args.num_sample) for struct in population]
         # select the best one from the population
         scores = np.array(scores)
         argidxs = np.argsort(scores)[::-1]
@@ -165,9 +220,9 @@ def evolution_search(dataiter, structure, iterations=1000, popu_size=50):
             offspring_struct = offspring_struct.mutate_by_genotype()
 
         # 3. Diversity-prompting selection
-        # offspring_zc = fitness_spearman(dataiter,  offspring_struct)
+        # offspring_zc = fitness_spearman(inputs,  offspring_struct, num_sample=args.num_sample)
         # newbie = structure()
-        # newbie_zc = fitness_spearman(dataiter,  newbie)
+        # newbie_zc = fitness_spearman(inputs,  newbie, num_sample=args.num_sample)
 
         # 4. delete the deteriorated structure
         del population[argidxs[-1]]
@@ -184,7 +239,7 @@ def evolution_search(dataiter, structure, iterations=1000, popu_size=50):
             population) == popu_size, f'Population size should be {popu_size}'
 
     # evaluate the fitness of all structures
-    scores = [fitness_spearman(dataiter, s) for s in population]
+    scores = [fitness_spearman(inputs, s, num_sample=args.num_sample) for s in population]
     argidxs = np.argsort(scores)[::-1]
     running_struct = population[argidxs[0]]
     logger.info(
@@ -192,14 +247,14 @@ def evolution_search(dataiter, structure, iterations=1000, popu_size=50):
     )
 
     # plot the evolution process
-    save_name = f'evolution_{type(newbie)}_{iterations}_{popu_size}_{random.randint(0, 1000)}_DPS'
+    save_name = f'evolution_{iterations}_{popu_size}_{random.randint(0, 1000)}'
     plt.plot(idx, sps)
     plt.xlabel('Iteration')
     plt.ylabel('Spearman')
-    plt.savefig(f'./output/evo_search_emq_zc/{save_name}.png')
+    plt.savefig(f'./output/{save_name}.png')
 
     # save idx and sps into csv file
-    with open(f'./output/evo_search_emq_zc/{save_name}.csv', 'w') as f:
+    with open(f'./output/{save_name}.csv', 'w') as f:
         writer = csv.writer(f)
         writer.writerows(zip(idx, sps))
 
@@ -234,39 +289,7 @@ def generate_inputs():
 
 
 if __name__ == '__main__':
-    parser = argparse.ArgumentParser(
-        description='running parameters',
-        formatter_class=argparse.ArgumentDefaultsHelpFormatter,
-    )
-
-    # general parameters for data and qnn
-    parser.add_argument(
-        '--seed', default=42, type=int, help='random seed for results reproduction'
-    )
-    parser.add_argument(
-        '--step', default=20, type=int, help='record snn output per step'
-    )
-
-    parser.add_argument(
-        '--iterations', default=1, type=int, help='number of iteration for LSQ'
-    )
-    # search space structure
-    parser.add_argument(
-        '--search_structure',
-        default='tree',
-        type=str,
-        help='search space structure, linear, tree or graph',
-    )
-
-    # popu size
-    parser.add_argument(
-        '--popu_size',
-        default=11,
-        type=int,
-        help='population size should be larger than 10',
-    )
-
-    args = parser.parse_args()
+    
 
     inputs = generate_inputs()
 
@@ -282,4 +305,4 @@ if __name__ == '__main__':
             f'Not support {args.search_structure} structure.')
 
     logger.info('Begin Evolution Search...')
-    evolution_search(args.dataiter, structure, args.iterations, args.popu_size)
+    evolution_search(inputs, structure, args.iterations, args.popu_size)
