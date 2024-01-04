@@ -1,4 +1,4 @@
-#!/bin/bash 
+#!/bin/bash
 
 NUM_SAMPLE=50
 # CUDA_VISIBLE_DEVICES=6 python lpzero/runner/evo_search.py \

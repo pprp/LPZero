@@ -1,5 +1,5 @@
 from scipy.stats import pearsonr, spearmanr
-from sklearn.metrics import matthews_corrcoef, f1_score
+from sklearn.metrics import f1_score, matthews_corrcoef
 
 
 def simple_accuracy(preds, labels):
@@ -15,7 +15,11 @@ def acc_and_f1(preds, labels):
 def pearson_and_spearman(preds, labels):
     pearson_corr = pearsonr(preds, labels)[0]
     spearman_corr = spearmanr(preds, labels)[0]
-    return {'pearsonr': pearson_corr, 'spearmanr': spearman_corr, 'corr': (pearson_corr + spearman_corr) / 2}
+    return {
+        'pearsonr': pearson_corr,
+        'spearmanr': spearman_corr,
+        'corr': (pearson_corr + spearman_corr) / 2,
+    }
 
 
 def compute_glue_metrics(task_name, preds, labels):

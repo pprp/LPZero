@@ -1,11 +1,13 @@
-from lpzero.runner.evo_search import generate_inputs 
-import json 
-import torch 
+import json
+
+import torch
+
 from lpzero.model.flexibert.modeling_electra import (
     ElectraConfig,
     ElectraLayer,
     ElectraModel,
 )
+from lpzero.runner.evo_search import generate_inputs
 from lpzero.structures.tree import TreeStructure
 
 device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
@@ -30,7 +32,6 @@ config = ElectraConfig(
 model = ElectraModel(config)
 model.to(device)
 inputs.to(device)
-
 
 tree = TreeStructure()
 

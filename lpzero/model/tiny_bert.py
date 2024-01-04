@@ -1,6 +1,6 @@
-import torch.nn as nn
 import datasets
 import models
+import torch.nn as nn
 
 
 class TinyBertSingle(nn.Module):
@@ -10,13 +10,18 @@ class TinyBertSingle(nn.Module):
         self.use_fit_dense = config.use_fit_dense
         self.use_lm = use_lm
         self.embeddings = models.BertEmbedding(config)
-        self.encoder = nn.ModuleList([models.BertTransformerBlock(config) for _ in range(config.num_layers)])
+        self.encoder = nn.ModuleList(
+            [models.BertTransformerBlock(config)
+             for _ in range(config.num_layers)]
+        )
 
         if self.use_fit_dense:
             self.fit_dense = nn.Linear(config.hidden_size, config.fit_size)
             # self.fit_denses = nn.ModuleList([nn.Linear(config.hidden_size, config.fit_size) for _ in range(config.num_layers + 1)])
         if self.use_lm:
-            self.lm_head = models.BertMaskedLMHead(config, self.embeddings.token_embeddings.weight)
+            self.lm_head = models.BertMaskedLMHead(
+                config, self.embeddings.token_embeddings.weight
+            )
         self._init_weights()
 
     def forward(self, token_ids, segment_ids, position_ids, attn_mask):
@@ -60,7 +65,10 @@ class TinyBert(nn.Module):
         self.task = task
         self.return_hid = return_hid
         self.embeddings = models.BertEmbedding(config)
-        self.encoder = nn.ModuleList([models.BertTransformerBlock(config) for _ in range(config.num_layers)])
+        self.encoder = nn.ModuleList(
+            [models.BertTransformerBlock(config)
+             for _ in range(config.num_layers)]
+        )
 
         if self.use_fit_dense:
             self.fit_dense = nn.Linear(config.hidden_size, config.fit_size)
@@ -111,7 +119,12 @@ class TinyBert(nn.Module):
             output = self.classifier(output)
             start_logits, end_logits = output.split(1, dim=-1)
             if self.return_hid:
-                return start_logits.squeeze(-1), end_logits.squeeze(-1), all_attn_outputs, all_ffn_outputs
+                return (
+                    start_logits.squeeze(-1),
+                    end_logits.squeeze(-1),
+                    all_attn_outputs,
+                    all_ffn_outputs,
+                )
             return start_logits.squeeze(-1), end_logits.squeeze(-1)
         elif self.task in datasets.multi_choice_tasks:
             output = self.cls_pooler(output[:, 0])

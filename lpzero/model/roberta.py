@@ -1,14 +1,18 @@
-import torch.nn as nn
 import datasets
 import models
+import torch.nn as nn
 
 
 class RobertaEmbedding(nn.Module):
     def __init__(self, config):
         super(RobertaEmbedding, self).__init__()
 
-        self.token_embeddings = nn.Embedding(config.vocab_size, config.hidden_size, padding_idx=config.pad_token_id)
-        self.position_embeddings = nn.Embedding(config.position_size, config.hidden_size, padding_idx=config.pad_token_id)
+        self.token_embeddings = nn.Embedding(
+            config.vocab_size, config.hidden_size, padding_idx=config.pad_token_id
+        )
+        self.position_embeddings = nn.Embedding(
+            config.position_size, config.hidden_size, padding_idx=config.pad_token_id
+        )
         self.layernorm = nn.LayerNorm(config.hidden_size)
         self.dropout = nn.Dropout(config.hidden_dropout_prob)
 
@@ -47,7 +51,10 @@ class Roberta(nn.Module):
 
         self.task = task
         self.embeddings = RobertaEmbedding(config)
-        self.encoder = nn.ModuleList([models.BertTransformerBlock(config) for _ in range(config.num_layers)])
+        self.encoder = nn.ModuleList(
+            [models.BertTransformerBlock(config)
+             for _ in range(config.num_layers)]
+        )
 
         if task in datasets.glue_tasks:
             self.num_classes = datasets.glue_num_classes[task]

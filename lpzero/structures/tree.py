@@ -76,7 +76,7 @@ class TreeStructure(BaseStructure):
 
     def forward_tree(self, inputs, model, return_all=False):
         try:
-        # if True:
+            # if True:
             A1, A2 = self._genotype['input_geno']
             A1 = get_zc_candidates(
                 self._genotype['input_geno'][0],

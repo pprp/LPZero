@@ -2,16 +2,19 @@
 This file is from https://github.com/mlpen/Nystromformer
 """
 
+import logging
+import math
+import pdb
+
+import numpy as np
 import torch
 import torch.nn as nn
-import numpy as np
-import math
 from torch.utils.checkpoint import checkpoint
+
 from .attention import Attention
 from .attention_transformer_ls import AttentionLS, FeedForwardNetworkLS
 from .dynamic_ops import DynamicLinear
-import pdb
-import logging
+
 
 class Embeddings(nn.Module):
     def __init__(self, config):
@@ -21,10 +24,13 @@ class Embeddings(nn.Module):
 
         self.dim = config.embedding_dim
 
-        self.word_embeddings = nn.Embedding(config.vocab_size, config.embedding_dim)
+        self.word_embeddings = nn.Embedding(
+            config.vocab_size, config.embedding_dim)
         torch.nn.init.normal_(self.word_embeddings.weight, std=0.02)
 
-        self.position_embeddings = nn.Embedding(config.max_seq_len, config.embedding_dim)
+        self.position_embeddings = nn.Embedding(
+            config.max_seq_len, config.embedding_dim
+        )
         torch.nn.init.normal_(self.position_embeddings.weight, std=0.02)
 
         if config.debug:
@@ -35,17 +41,24 @@ class Embeddings(nn.Module):
 
     def fixed_pos_emb(self, seq_len, device):
         position = torch.arange(0, seq_len, device=device)[:, np.newaxis]
-        div_term = torch.exp(torch.arange(0, self.dim, 2, device=device) * -(math.log(10000.0) / self.dim))
-        pos_embed = torch.stack([torch.sin(position * div_term), torch.cos(position * div_term)], -1).reshape(seq_len, -1)
+        div_term = torch.exp(
+            torch.arange(0, self.dim, 2, device=device)
+            * -(math.log(10000.0) / self.dim)
+        )
+        pos_embed = torch.stack(
+            [torch.sin(position * div_term),
+             torch.cos(position * div_term)], -1
+        ).reshape(seq_len, -1)
         return pos_embed
 
     def forward(self, input_ids):
-
         batch_size, seq_len = input_ids.size()
 
         X_token = self.word_embeddings(input_ids)
 
-        position_ids = torch.arange(seq_len, dtype=torch.long, device=input_ids.device)[None, :].repeat(batch_size, 1)
+        position_ids = torch.arange(seq_len, dtype=torch.long, device=input_ids.device)[
+            None, :
+        ].repeat(batch_size, 1)
         X_pos = self.position_embeddings(position_ids)
 
         X = X_token + X_pos
@@ -53,6 +66,7 @@ class Embeddings(nn.Module):
         X = self.dropout(X)
 
         return X
+
 
 class TransformerLSLayer(nn.Module):
     def __init__(self, config):
@@ -69,9 +83,11 @@ class TransformerLSLayer(nn.Module):
 
         self.mlpblock = FeedForwardNetworkLS(config)
 
-    def forward(self, X, mask, cls_embed=None, is_calc_pca_cka = False):
+    def forward(self, X, mask, cls_embed=None, is_calc_pca_cka=False):
         if cls_embed is None:
-            attn_output, attn_score, one_cka = self.mha(self.norm1(X), mask, is_calc_cka=is_calc_pca_cka)
+            attn_output, attn_score, one_cka = self.mha(
+                self.norm1(X), mask, is_calc_cka=is_calc_pca_cka
+            )
             output = self.dropout1(attn_output) + attn_output
         else:
             if cls_embed.shape[0] == 1:
@@ -79,9 +95,20 @@ class TransformerLSLayer(nn.Module):
             X_prepend = torch.cat([cls_embed, X], dim=1)
             if self.debug:
                 cls_embed = self.norm1(cls_embed)
-            X = self.dropout1(self.mha(self.norm1(X), mask, is_calc_cka=is_calc_pca_cka, cls_embed=cls_embed)) + X_prepend
-        #logging.info('output={}'.format(output))
-        ffn_output, one_pca = self.mlpblock(self.norm2(output), is_calc_pca_cka)
+            X = (
+                self.dropout1(
+                    self.mha(
+                        self.norm1(X),
+                        mask,
+                        is_calc_cka=is_calc_pca_cka,
+                        cls_embed=cls_embed,
+                    )
+                )
+                + X_prepend
+            )
+        # logging.info('output={}'.format(output))
+        ffn_output, one_pca = self.mlpblock(
+            self.norm2(output), is_calc_pca_cka)
         output = ffn_output + output
         return output, attn_output, attn_score, one_cka, one_pca
 
@@ -104,6 +131,7 @@ class TransformerLSLayer(nn.Module):
         flops += self.mlpblock.flops(seq_len)
         return flops
 
+
 class Model(nn.Module):
     def __init__(self, config):
         super().__init__()
@@ -115,7 +143,8 @@ class Model(nn.Module):
         self.embeddings = Embeddings(config)
 
         if config.cls_token or self.cls_last_layer:
-            self.cls_embed = nn.Parameter(torch.zeros(1, 1, config.transformer_dim))
+            self.cls_embed = nn.Parameter(
+                torch.zeros(1, 1, config.transformer_dim))
         else:
             self.cls_embed = None
 
@@ -123,7 +152,7 @@ class Model(nn.Module):
             self.transformer = TransformerLSLayer(config)
         else:
             for idx in range(self.num_layers):
-                setattr(self, f"transformer_{idx}", TransformerLSLayer(config))
+                setattr(self, f'transformer_{idx}', TransformerLSLayer(config))
 
         self.norm = nn.LayerNorm(config.transformer_dim)
 
@@ -147,7 +176,7 @@ class Model(nn.Module):
             for idx in range(self.num_layers):
                 if self.cls_last_layer and idx == self.num_layers - 1:
                     cls_embed = self.cls_embed
-                X = getattr(self, f"transformer_{idx}")(X, mask, cls_embed)
+                X = getattr(self, f'transformer_{idx}')(X, mask, cls_embed)
                 if cls_embed is not None:
                     # We always prepend the cls token into the first token
                     cls_embed = X[:, :1]

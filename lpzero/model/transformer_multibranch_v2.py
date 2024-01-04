@@ -5,30 +5,28 @@
 
 import math
 
+import fairseq.init as init
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
-
 from fairseq import options, utils
 from fairseq.models import (
     FairseqEncoder,
-    FairseqIncrementalDecoder,
     FairseqEncoderDecoderModel,
+    FairseqIncrementalDecoder,
     register_model,
     register_model_architecture,
 )
 from fairseq.modules import (
     AdaptiveSoftmax,
+    DynamicConv,
     LayerNorm,
+    LightweightConv,
+    MultiBranch,
+    MultiheadAttention,
     PositionalEmbedding,
     SinusoidalPositionalEmbedding,
-    LightweightConv,
-    DynamicConv,
-    MultiheadAttention,
-    MultiBranch,
 )
-
-import fairseq.init as init
 
 DEFAULT_MAX_SOURCE_POSITIONS = 1024
 DEFAULT_MAX_TARGET_POSITIONS = 1024
@@ -56,17 +54,28 @@ class TransformerMultibranchModel(FairseqEncoderDecoderModel):
     def hub_models(cls):
         # fmt: off
         return {
-            'transformer.wmt14.en-fr': 'https://dl.fbaipublicfiles.com/fairseq/models/wmt14.en-fr.joined-dict.transformer.tar.bz2',
-            'transformer.wmt16.en-de': 'https://dl.fbaipublicfiles.com/fairseq/models/wmt16.en-de.joined-dict.transformer.tar.bz2',
-            'transformer.wmt18.en-de': 'https://dl.fbaipublicfiles.com/fairseq/models/wmt18.en-de.ensemble.tar.gz',
-            'transformer.wmt19.en-de': 'https://dl.fbaipublicfiles.com/fairseq/models/wmt19.en-de.joined-dict.ensemble.tar.gz',
-            'transformer.wmt19.en-ru': 'https://dl.fbaipublicfiles.com/fairseq/models/wmt19.en-ru.ensemble.tar.gz',
-            'transformer.wmt19.de-en': 'https://dl.fbaipublicfiles.com/fairseq/models/wmt19.de-en.joined-dict.ensemble.tar.gz',
-            'transformer.wmt19.ru-en': 'https://dl.fbaipublicfiles.com/fairseq/models/wmt19.ru-en.ensemble.tar.gz',
-            'transformer.wmt19.en-de.single_model': 'https://dl.fbaipublicfiles.com/fairseq/models/wmt19.en-de.joined-dict.single_model.tar.gz',
-            'transformer.wmt19.en-ru.single_model': 'https://dl.fbaipublicfiles.com/fairseq/models/wmt19.en-ru.single_model.tar.gz',
-            'transformer.wmt19.de-en.single_model': 'https://dl.fbaipublicfiles.com/fairseq/models/wmt19.de-en.joined-dict.single_model.tar.gz',
-            'transformer.wmt19.ru-en.single_model': 'https://dl.fbaipublicfiles.com/fairseq/models/wmt19.ru-en.single_model.tar.gz',
+            'transformer.wmt14.en-fr':
+            'https://dl.fbaipublicfiles.com/fairseq/models/wmt14.en-fr.joined-dict.transformer.tar.bz2',
+            'transformer.wmt16.en-de':
+            'https://dl.fbaipublicfiles.com/fairseq/models/wmt16.en-de.joined-dict.transformer.tar.bz2',
+            'transformer.wmt18.en-de':
+            'https://dl.fbaipublicfiles.com/fairseq/models/wmt18.en-de.ensemble.tar.gz',
+            'transformer.wmt19.en-de':
+            'https://dl.fbaipublicfiles.com/fairseq/models/wmt19.en-de.joined-dict.ensemble.tar.gz',
+            'transformer.wmt19.en-ru':
+            'https://dl.fbaipublicfiles.com/fairseq/models/wmt19.en-ru.ensemble.tar.gz',
+            'transformer.wmt19.de-en':
+            'https://dl.fbaipublicfiles.com/fairseq/models/wmt19.de-en.joined-dict.ensemble.tar.gz',
+            'transformer.wmt19.ru-en':
+            'https://dl.fbaipublicfiles.com/fairseq/models/wmt19.ru-en.ensemble.tar.gz',
+            'transformer.wmt19.en-de.single_model':
+            'https://dl.fbaipublicfiles.com/fairseq/models/wmt19.en-de.joined-dict.single_model.tar.gz',
+            'transformer.wmt19.en-ru.single_model':
+            'https://dl.fbaipublicfiles.com/fairseq/models/wmt19.en-ru.single_model.tar.gz',
+            'transformer.wmt19.de-en.single_model':
+            'https://dl.fbaipublicfiles.com/fairseq/models/wmt19.de-en.joined-dict.single_model.tar.gz',
+            'transformer.wmt19.ru-en.single_model':
+            'https://dl.fbaipublicfiles.com/fairseq/models/wmt19.ru-en.single_model.tar.gz',
         }
         # fmt: on
 
@@ -77,76 +86,159 @@ class TransformerMultibranchModel(FairseqEncoderDecoderModel):
     def add_args(parser):
         """Add model-specific arguments to the parser."""
         # fmt: off
-        parser.add_argument('--activation-fn',
-                            choices=utils.get_available_activation_fns(),
-                            help='activation function to use')
-        parser.add_argument('--dropout', type=float, metavar='D',
-                            help='dropout probability')
-        parser.add_argument('--attention-dropout', type=float, metavar='D',
-                            help='dropout probability for attention weights')
-        parser.add_argument('--activation-dropout', '--relu-dropout', type=float, metavar='D',
-                            help='dropout probability after activation in FFN.')
-        parser.add_argument('--encoder-embed-path', type=str, metavar='STR',
-                            help='path to pre-trained encoder embedding')
-        parser.add_argument('--encoder-embed-dim', type=int, metavar='N',
-                            help='encoder embedding dimension')
-        parser.add_argument('--encoder-ffn-embed-dim', type=int, metavar='N',
-                            help='encoder embedding dimension for FFN')
-        parser.add_argument('--encoder-layers', type=int, metavar='N',
-                            help='num encoder layers')
-        parser.add_argument('--encoder-attention-heads', type=int, metavar='N',
-                            help='num encoder attention heads')
-        parser.add_argument('--encoder-normalize-before', action='store_true',
-                            help='apply layernorm before each encoder block')
-        parser.add_argument('--encoder-learned-pos', action='store_true',
-                            help='use learned positional embeddings in the encoder')
-        parser.add_argument('--decoder-embed-path', type=str, metavar='STR',
-                            help='path to pre-trained decoder embedding')
-        parser.add_argument('--decoder-embed-dim', type=int, metavar='N',
-                            help='decoder embedding dimension')
-        parser.add_argument('--decoder-ffn-embed-dim', type=int, metavar='N',
-                            help='decoder embedding dimension for FFN')
-        parser.add_argument('--decoder-layers', type=int, metavar='N',
-                            help='num decoder layers')
-        parser.add_argument('--decoder-attention-heads', type=int, metavar='N',
-                            help='num decoder attention heads')
-        parser.add_argument('--decoder-learned-pos', action='store_true',
-                            help='use learned positional embeddings in the decoder')
-        parser.add_argument('--decoder-normalize-before', action='store_true',
-                            help='apply layernorm before each decoder block')
-        parser.add_argument('--share-decoder-input-output-embed', action='store_true',
-                            help='share decoder input and output embeddings')
-        parser.add_argument('--share-all-embeddings', action='store_true',
-                            help='share encoder, decoder and output embeddings'
-                                 ' (requires shared dictionary and embed dim)')
-        parser.add_argument('--no-token-positional-embeddings', default=False, action='store_true',
-                            help='if set, disables positional embeddings (outside self attention)')
-        parser.add_argument('--adaptive-softmax-cutoff', metavar='EXPR',
-                            help='comma separated list of adaptive softmax cutoff points. '
-                                 'Must be used with adaptive_loss criterion'),
-        parser.add_argument('--adaptive-softmax-dropout', type=float, metavar='D',
-                            help='sets adaptive softmax dropout for the tail projections')
+        parser.add_argument(
+            '--activation-fn',
+            choices=utils.get_available_activation_fns(),
+            help='activation function to use')
+        parser.add_argument(
+            '--dropout', type=float, metavar='D', help='dropout probability')
+        parser.add_argument(
+            '--attention-dropout',
+            type=float,
+            metavar='D',
+            help='dropout probability for attention weights')
+        parser.add_argument(
+            '--activation-dropout',
+            '--relu-dropout',
+            type=float,
+            metavar='D',
+            help='dropout probability after activation in FFN.')
+        parser.add_argument(
+            '--encoder-embed-path',
+            type=str,
+            metavar='STR',
+            help='path to pre-trained encoder embedding')
+        parser.add_argument(
+            '--encoder-embed-dim',
+            type=int,
+            metavar='N',
+            help='encoder embedding dimension')
+        parser.add_argument(
+            '--encoder-ffn-embed-dim',
+            type=int,
+            metavar='N',
+            help='encoder embedding dimension for FFN')
+        parser.add_argument(
+            '--encoder-layers',
+            type=int,
+            metavar='N',
+            help='num encoder layers')
+        parser.add_argument(
+            '--encoder-attention-heads',
+            type=int,
+            metavar='N',
+            help='num encoder attention heads')
+        parser.add_argument(
+            '--encoder-normalize-before',
+            action='store_true',
+            help='apply layernorm before each encoder block')
+        parser.add_argument(
+            '--encoder-learned-pos',
+            action='store_true',
+            help='use learned positional embeddings in the encoder')
+        parser.add_argument(
+            '--decoder-embed-path',
+            type=str,
+            metavar='STR',
+            help='path to pre-trained decoder embedding')
+        parser.add_argument(
+            '--decoder-embed-dim',
+            type=int,
+            metavar='N',
+            help='decoder embedding dimension')
+        parser.add_argument(
+            '--decoder-ffn-embed-dim',
+            type=int,
+            metavar='N',
+            help='decoder embedding dimension for FFN')
+        parser.add_argument(
+            '--decoder-layers',
+            type=int,
+            metavar='N',
+            help='num decoder layers')
+        parser.add_argument(
+            '--decoder-attention-heads',
+            type=int,
+            metavar='N',
+            help='num decoder attention heads')
+        parser.add_argument(
+            '--decoder-learned-pos',
+            action='store_true',
+            help='use learned positional embeddings in the decoder')
+        parser.add_argument(
+            '--decoder-normalize-before',
+            action='store_true',
+            help='apply layernorm before each decoder block')
+        parser.add_argument(
+            '--share-decoder-input-output-embed',
+            action='store_true',
+            help='share decoder input and output embeddings')
+        parser.add_argument(
+            '--share-all-embeddings',
+            action='store_true',
+            help='share encoder, decoder and output embeddings'
+            ' (requires shared dictionary and embed dim)')
+        parser.add_argument(
+            '--no-token-positional-embeddings',
+            default=False,
+            action='store_true',
+            help=
+            'if set, disables positional embeddings (outside self attention)')
+        parser.add_argument(
+            '--adaptive-softmax-cutoff',
+            metavar='EXPR',
+            help='comma separated list of adaptive softmax cutoff points. '
+            'Must be used with adaptive_loss criterion'),
+        parser.add_argument(
+            '--adaptive-softmax-dropout',
+            type=float,
+            metavar='D',
+            help='sets adaptive softmax dropout for the tail projections')
 
-        parser.add_argument('--encoder-glu', type=options.eval_bool,
-                            help='glu after in proj')
-        parser.add_argument('--decoder-glu', type=options.eval_bool,
-                            help='glu after in proj')
-        parser.add_argument('--weight-softmax', default=True, type=options.eval_bool)
-        parser.add_argument('--weight-dropout', type=float, metavar='D',
-                            help='dropout probability for conv weights')
-        parser.add_argument('--encoder-branch-type', nargs='+', default=None, type=str,
-                            help='type of branches type:kernel:dim:head')
-        parser.add_argument('--decoder-branch-type', nargs='+', default=None, type=str,
-                            help='type of branches type:kernel:dim:head')
-        parser.add_argument('--encoder-decoder-branch-type', nargs='+', default=None, type=str)
+        parser.add_argument(
+            '--encoder-glu', type=options.eval_bool, help='glu after in proj')
+        parser.add_argument(
+            '--decoder-glu', type=options.eval_bool, help='glu after in proj')
+        parser.add_argument(
+            '--weight-softmax', default=True, type=options.eval_bool)
+        parser.add_argument(
+            '--weight-dropout',
+            type=float,
+            metavar='D',
+            help='dropout probability for conv weights')
+        parser.add_argument(
+            '--encoder-branch-type',
+            nargs='+',
+            default=None,
+            type=str,
+            help='type of branches type:kernel:dim:head')
+        parser.add_argument(
+            '--decoder-branch-type',
+            nargs='+',
+            default=None,
+            type=str,
+            help='type of branches type:kernel:dim:head')
+        parser.add_argument(
+            '--encoder-decoder-branch-type', nargs='+', default=None, type=str)
 
-        parser.add_argument('--conv-linear', default=False, action='store_true')
+        parser.add_argument(
+            '--conv-linear', default=False, action='store_true')
 
-        parser.add_argument('--encoder-ffn-list', type=eval, nargs='+', default=[True])
-        parser.add_argument('--decoder-ffn-list', type=eval, nargs='+', default=[True])
+        parser.add_argument(
+            '--encoder-ffn-list', type=eval, nargs='+', default=[True])
+        parser.add_argument(
+            '--decoder-ffn-list', type=eval, nargs='+', default=[True])
 
-        parser.add_argument('--decoder-kernel-size-list', nargs='*', default=[3, 7, 15, 31, 31, 31, 31], type=int)
-        parser.add_argument('--encoder-kernel-size-list', nargs='*', default=[3, 7, 15, 31, 31, 31, 31], type=int)
+        parser.add_argument(
+            '--decoder-kernel-size-list',
+            nargs='*',
+            default=[3, 7, 15, 31, 31, 31, 31],
+            type=int)
+        parser.add_argument(
+            '--encoder-kernel-size-list',
+            nargs='*',
+            default=[3, 7, 15, 31, 31, 31, 31],
+            type=int)
         # fmt: on
 
     @classmethod
@@ -178,13 +270,18 @@ class TransformerMultibranchModel(FairseqEncoderDecoderModel):
         input_transform_e, input_transform_d = None, None
         if args.share_all_embeddings:
             if src_dict != tgt_dict:
-                raise ValueError('--share-all-embeddings requires a joined dictionary')
+                raise ValueError(
+                    '--share-all-embeddings requires a joined dictionary')
             if args.encoder_embed_dim != args.decoder_embed_dim:
                 raise ValueError(
-                    '--share-all-embeddings requires --encoder-embed-dim to match --decoder-embed-dim')
+                    '--share-all-embeddings requires --encoder-embed-dim to match --decoder-embed-dim'
+                )
             if args.decoder_embed_path and (
-                    args.decoder_embed_path != args.encoder_embed_path):
-                raise ValueError('--share-all-embeddings not compatible with --decoder-embed-path')
+                args.decoder_embed_path != args.encoder_embed_path
+            ):
+                raise ValueError(
+                    '--share-all-embeddings not compatible with --decoder-embed-path'
+                )
 
             encoder_embed_tokens = build_embedding(
                 src_dict, args.encoder_embed_dim, args.encoder_embed_path
@@ -199,8 +296,12 @@ class TransformerMultibranchModel(FairseqEncoderDecoderModel):
                 tgt_dict, args.decoder_embed_dim, args.decoder_embed_path
             )
 
-        encoder = cls.build_encoder(args, src_dict, encoder_embed_tokens, input_transform_e)
-        decoder = cls.build_decoder(args, tgt_dict, decoder_embed_tokens, input_transform_d)
+        encoder = cls.build_encoder(
+            args, src_dict, encoder_embed_tokens, input_transform_e
+        )
+        decoder = cls.build_decoder(
+            args, tgt_dict, decoder_embed_tokens, input_transform_d
+        )
         return TransformerMultibranchModel(encoder, decoder)
 
     @classmethod
@@ -210,32 +311,37 @@ class TransformerMultibranchModel(FairseqEncoderDecoderModel):
                 Linear(args.project_embed, args.encoder_embed_dim, bias=False),
             )
         else:
-            input_transform_e=input_transform_d=nn.Sequential(
+            input_transform_e = input_transform_d = nn.Sequential(
                 Linear(args.project_embed, args.project_hidden, bias=False),
                 nn.ReLU(),
                 Linear(args.project_hidden, args.encoder_embed_dim, bias=False),
             )
         if args.project_not_share:
             if args.project_hidden is None:
-                input_transform_d=nn.Sequential(
-                    Linear(args.project_embed, args.decoder_embed_dim, bias=False),
+                input_transform_d = nn.Sequential(
+                    Linear(args.project_embed,
+                           args.decoder_embed_dim, bias=False),
                 )
             else:
                 input_transform_d = nn.Sequential(
                     Linear(args.project_embed, args.project_hidden, bias=False),
                     nn.ReLU(),
-                    Linear(args.project_hidden, args.decoder_embed_dim, bias=False),
+                    Linear(args.project_hidden,
+                           args.decoder_embed_dim, bias=False),
                 )
         return input_transform_e, input_transform_d
 
-
     @classmethod
     def build_encoder(cls, args, src_dict, embed_tokens, input_transform=None):
-        return TransformerEncoder(args, src_dict, embed_tokens, input_transform=input_transform)
+        return TransformerEncoder(
+            args, src_dict, embed_tokens, input_transform=input_transform
+        )
 
     @classmethod
     def build_decoder(cls, args, tgt_dict, embed_tokens, input_transform=None):
-        return TransformerDecoder(args, tgt_dict, embed_tokens, input_transform=input_transform)
+        return TransformerDecoder(
+            args, tgt_dict, embed_tokens, input_transform=input_transform
+        )
 
 
 class TransformerEncoder(FairseqEncoder):
@@ -257,22 +363,28 @@ class TransformerEncoder(FairseqEncoder):
 
         embed_dim = args.encoder_embed_dim
         self.input_transform = input_transform
-        
+
         self.padding_idx = embed_tokens.padding_idx
         self.max_source_positions = args.max_source_positions
 
         self.embed_tokens = embed_tokens
         self.embed_scale = math.sqrt(embed_dim)
-        self.embed_positions = PositionalEmbedding(
-            args.max_source_positions, embed_dim, self.padding_idx,
-            learned=args.encoder_learned_pos,
-        ) if not args.no_token_positional_embeddings else None
+        self.embed_positions = (
+            PositionalEmbedding(
+                args.max_source_positions,
+                embed_dim,
+                self.padding_idx,
+                learned=args.encoder_learned_pos,
+            )
+            if not args.no_token_positional_embeddings
+            else None
+        )
 
         self.layers = nn.ModuleList([])
-        self.layers.extend([
-            TransformerEncoderLayer(args, i)
-            for i in range(args.encoder_layers)
-        ])
+        self.layers.extend(
+            [TransformerEncoderLayer(args, i)
+             for i in range(args.encoder_layers)]
+        )
 
         if args.encoder_normalize_before:
             self.layer_norm = LayerNorm(embed_dim)
@@ -333,11 +445,13 @@ class TransformerEncoder(FairseqEncoder):
             *encoder_out* rearranged according to *new_order*
         """
         if encoder_out['encoder_out'] is not None:
-            encoder_out['encoder_out'] = \
-                encoder_out['encoder_out'].index_select(1, new_order)
+            encoder_out['encoder_out'] = encoder_out['encoder_out'].index_select(
+                1, new_order
+            )
         if encoder_out['encoder_padding_mask'] is not None:
-            encoder_out['encoder_padding_mask'] = \
-                encoder_out['encoder_padding_mask'].index_select(0, new_order)
+            encoder_out['encoder_padding_mask'] = encoder_out[
+                'encoder_padding_mask'
+            ].index_select(0, new_order)
         return encoder_out
 
     def max_positions(self):
@@ -352,10 +466,14 @@ class TransformerEncoder(FairseqEncoder):
             weights_key = '{}.embed_positions.weights'.format(name)
             if weights_key in state_dict:
                 del state_dict[weights_key]
-            state_dict['{}.embed_positions._float_tensor'.format(name)] = torch.FloatTensor(1)
+            state_dict[
+                '{}.embed_positions._float_tensor'.format(name)
+            ] = torch.FloatTensor(1)
         for i in range(len(self.layers)):
             # update layer norms
-            self.layers[i].upgrade_state_dict_named(state_dict, "{}.layers.{}".format(name, i))
+            self.layers[i].upgrade_state_dict_named(
+                state_dict, '{}.layers.{}'.format(name, i)
+            )
 
         version_key = '{}.version'.format(name)
         if utils.item(state_dict.get(version_key, torch.Tensor([1]))[0]) < 2:
@@ -379,7 +497,14 @@ class TransformerDecoder(FairseqIncrementalDecoder):
             (default: False).
     """
 
-    def __init__(self, args, dictionary, embed_tokens, no_encoder_attn=False, input_transform=None):
+    def __init__(
+        self,
+        args,
+        dictionary,
+        embed_tokens,
+        no_encoder_attn=False,
+        input_transform=None,
+    ):
         super().__init__(dictionary)
         self.register_buffer('version', torch.Tensor([3]))
 
@@ -394,25 +519,36 @@ class TransformerDecoder(FairseqIncrementalDecoder):
         self.max_target_positions = args.max_target_positions
 
         self.embed_tokens = embed_tokens
-        self.embed_scale = math.sqrt(embed_dim)  # todo: try with input_embed_dim
+        # todo: try with input_embed_dim
+        self.embed_scale = math.sqrt(embed_dim)
 
         self.input_transform = input_transform
-        self.embed_positions = PositionalEmbedding(
-            args.max_target_positions, embed_dim, padding_idx,
-            learned=args.decoder_learned_pos,
-        ) if not args.no_token_positional_embeddings else None
+        self.embed_positions = (
+            PositionalEmbedding(
+                args.max_target_positions,
+                embed_dim,
+                padding_idx,
+                learned=args.decoder_learned_pos,
+            )
+            if not args.no_token_positional_embeddings
+            else None
+        )
 
         self.layers = nn.ModuleList([])
-        self.layers.extend([
-            TransformerDecoderLayer(args, i, no_encoder_attn)
-            for i in range(args.decoder_layers)
-        ])
+        self.layers.extend(
+            [
+                TransformerDecoderLayer(args, i, no_encoder_attn)
+                for i in range(args.decoder_layers)
+            ]
+        )
 
         self.adaptive_softmax = None
 
-        self.project_out_dim = Linear(embed_dim, self.output_embed_dim, bias=False) \
-            if embed_dim != self.output_embed_dim and not args.tie_adaptive_weights else None
-            
+        self.project_out_dim = (
+            Linear(embed_dim, self.output_embed_dim, bias=False)
+            if embed_dim != self.output_embed_dim and not args.tie_adaptive_weights
+            else None
+        )
 
         if args.adaptive_softmax_cutoff is not None:
             self.adaptive_softmax = AdaptiveSoftmax(
@@ -425,15 +561,22 @@ class TransformerDecoder(FairseqIncrementalDecoder):
                 tie_proj=args.tie_adaptive_proj,
             )
         elif not self.share_input_output_embed:
-            self.embed_out = nn.Parameter(torch.Tensor(len(dictionary), self.output_embed_dim))
-            nn.init.normal_(self.embed_out, mean=0, std=self.output_embed_dim ** -0.5)
+            self.embed_out = nn.Parameter(
+                torch.Tensor(len(dictionary), self.output_embed_dim)
+            )
+            nn.init.normal_(self.embed_out, mean=0,
+                            std=self.output_embed_dim**-0.5)
 
-        if args.decoder_normalize_before and not getattr(args, 'no_decoder_final_norm', False):
+        if args.decoder_normalize_before and not getattr(
+            args, 'no_decoder_final_norm', False
+        ):
             self.layer_norm = LayerNorm(embed_dim)
         else:
             self.layer_norm = None
 
-    def forward(self, prev_output_tokens, encoder_out=None, incremental_state=None, **unused):
+    def forward(
+        self, prev_output_tokens, encoder_out=None, incremental_state=None, **unused
+    ):
         """
         Args:
             prev_output_tokens (LongTensor): previous decoder outputs of shape
@@ -448,11 +591,15 @@ class TransformerDecoder(FairseqIncrementalDecoder):
                 - the decoder's output of shape `(batch, tgt_len, vocab)`
                 - a dictionary with any model-specific outputs
         """
-        x, extra = self.extract_features(prev_output_tokens, encoder_out, incremental_state)
+        x, extra = self.extract_features(
+            prev_output_tokens, encoder_out, incremental_state
+        )
         x = self.output_layer(x)
         return x, extra
 
-    def extract_features(self, prev_output_tokens, encoder_out=None, incremental_state=None, **unused):
+    def extract_features(
+        self, prev_output_tokens, encoder_out=None, incremental_state=None, **unused
+    ):
         """
         Similar to *forward* but only return features.
 
@@ -462,10 +609,14 @@ class TransformerDecoder(FairseqIncrementalDecoder):
                 - a dictionary with any model-specific outputs
         """
         # embed positions
-        positions = self.embed_positions(
-            prev_output_tokens,
-            incremental_state=incremental_state,
-        ) if self.embed_positions is not None else None
+        positions = (
+            self.embed_positions(
+                prev_output_tokens,
+                incremental_state=incremental_state,
+            )
+            if self.embed_positions is not None
+            else None
+        )
 
         if incremental_state is not None:
             prev_output_tokens = prev_output_tokens[:, -1:]
@@ -491,9 +642,13 @@ class TransformerDecoder(FairseqIncrementalDecoder):
             x, attn = layer(
                 x,
                 encoder_out['encoder_out'] if encoder_out is not None else None,
-                encoder_out['encoder_padding_mask'] if encoder_out is not None else None,
+                encoder_out['encoder_padding_mask']
+                if encoder_out is not None
+                else None,
                 incremental_state,
-                self_attn_mask=self.buffered_future_mask(x) if incremental_state is None else None,
+                self_attn_mask=self.buffered_future_mask(x)
+                if incremental_state is None
+                else None,
             )
             inner_states.append(x)
 
@@ -524,8 +679,15 @@ class TransformerDecoder(FairseqIncrementalDecoder):
 
     def buffered_future_mask(self, tensor):
         dim = tensor.size(0)
-        if not hasattr(self, '_future_mask') or self._future_mask is None or self._future_mask.device != tensor.device or self._future_mask.size(0) < dim:
-            self._future_mask = torch.triu(utils.fill_with_neg_inf(tensor.new(dim, dim)), 1)
+        if (
+            not hasattr(self, '_future_mask')
+            or self._future_mask is None
+            or self._future_mask.device != tensor.device
+            or self._future_mask.size(0) < dim
+        ):
+            self._future_mask = torch.triu(
+                utils.fill_with_neg_inf(tensor.new(dim, dim)), 1
+            )
         return self._future_mask[:dim, :dim]
 
     def upgrade_state_dict_named(self, state_dict, name):
@@ -534,20 +696,25 @@ class TransformerDecoder(FairseqIncrementalDecoder):
             weights_key = '{}.embed_positions.weights'.format(name)
             if weights_key in state_dict:
                 del state_dict[weights_key]
-            state_dict['{}.embed_positions._float_tensor'.format(name)] = torch.FloatTensor(1)
+            state_dict[
+                '{}.embed_positions._float_tensor'.format(name)
+            ] = torch.FloatTensor(1)
 
         for i in range(len(self.layers)):
             # update layer norms
             layer_norm_map = {
                 '0': 'self_attn_layer_norm',
                 '1': 'encoder_attn_layer_norm',
-                '2': 'final_layer_norm'
+                '2': 'final_layer_norm',
             }
             for old, new in layer_norm_map.items():
                 for m in ('weight', 'bias'):
-                    k = '{}.layers.{}.layer_norms.{}.{}'.format(name, i, old, m)
+                    k = '{}.layers.{}.layer_norms.{}.{}'.format(
+                        name, i, old, m)
                     if k in state_dict:
-                        state_dict['{}.layers.{}.{}.{}'.format(name, i, new, m)] = state_dict[k]
+                        state_dict[
+                            '{}.layers.{}.{}.{}'.format(name, i, new, m)
+                        ] = state_dict[k]
                         del state_dict[k]
 
         version_key = '{}.version'.format(name)
@@ -578,7 +745,6 @@ class TransformerEncoderLayer(nn.Module):
     def __init__(self, args, index=0):
         super().__init__()
         self.embed_dim = args.encoder_embed_dim
-        
 
         self.self_attn_layer_norm = LayerNorm(self.embed_dim)
         self.dropout = args.dropout
@@ -588,8 +754,10 @@ class TransformerEncoderLayer(nn.Module):
 
         if args.encoder_branch_type is None:
             self.self_attn = MultiheadAttention(
-                self.embed_dim, args.encoder_attention_heads,
-                dropout=args.attention_dropout, self_attention=True,
+                self.embed_dim,
+                args.encoder_attention_heads,
+                dropout=args.attention_dropout,
+                self_attention=True,
             )
         else:
             layers = []
@@ -599,9 +767,13 @@ class TransformerEncoderLayer(nn.Module):
             for layer_type in args.encoder_branch_type:
                 embed_dims.append(int(layer_type.split(':')[2]))
                 heads.append(int(layer_type.split(':')[3]))
-                layers.append(self.get_layer(args, index, embed_dims[-1], heads[-1], layer_type))
-            assert sum(embed_dims) == self.embed_dim, (sum(embed_dims), self.embed_dim)
-            
+                layers.append(
+                    self.get_layer(
+                        args, index, embed_dims[-1], heads[-1], layer_type)
+                )
+            assert sum(embed_dims) == self.embed_dim, (sum(
+                embed_dims), self.embed_dim)
+
             self.self_attn = MultiBranch(layers, embed_dims)
 
         self.activation_dropout = getattr(args, 'activation_dropout', 0)
@@ -610,8 +782,12 @@ class TransformerEncoderLayer(nn.Module):
             self.activation_dropout = getattr(args, 'relu_dropout', 0)
 
         self.normalize_before = args.encoder_normalize_before
-        self.fc1 = Linear(self.embed_dim, args.encoder_ffn_embed_dim, init=args.ffn_init)
-        self.fc2 = Linear(args.encoder_ffn_embed_dim, self.embed_dim, init=args.ffn_init)
+        self.fc1 = Linear(
+            self.embed_dim, args.encoder_ffn_embed_dim, init=args.ffn_init
+        )
+        self.fc2 = Linear(
+            args.encoder_ffn_embed_dim, self.embed_dim, init=args.ffn_init
+        )
         self.final_layer_norm = LayerNorm(self.embed_dim)
 
     def get_layer(self, args, index, out_dim, num_heads, layer_type):
@@ -620,28 +796,42 @@ class TransformerEncoderLayer(nn.Module):
             kernel_size = args.encoder_kernel_size_list[index]
         else:
             kernel_size = int(kernel_size)
-        padding_l = kernel_size // 2 if kernel_size % 2 == 1 else ((kernel_size - 1) // 2, kernel_size // 2)
+        padding_l = (
+            kernel_size // 2
+            if kernel_size % 2 == 1
+            else ((kernel_size - 1) // 2, kernel_size // 2)
+        )
         if 'lightweight' in layer_type:
             layer = LightweightConv(
-                out_dim, kernel_size, padding_l=padding_l, weight_softmax=args.weight_softmax,
-                num_heads=num_heads,  weight_dropout=args.weight_dropout,
+                out_dim,
+                kernel_size,
+                padding_l=padding_l,
+                weight_softmax=args.weight_softmax,
+                num_heads=num_heads,
+                weight_dropout=args.weight_dropout,
                 with_linear=args.conv_linear,
             )
         elif 'dynamic' in layer_type:
             layer = DynamicConv(
-                out_dim, kernel_size, padding_l=padding_l,
-                weight_softmax=args.weight_softmax, num_heads=num_heads,
-                weight_dropout=args.weight_dropout, with_linear=args.conv_linear,
+                out_dim,
+                kernel_size,
+                padding_l=padding_l,
+                weight_softmax=args.weight_softmax,
+                num_heads=num_heads,
+                weight_dropout=args.weight_dropout,
+                with_linear=args.conv_linear,
                 glu=args.encoder_glu,
             )
         elif 'attn' in layer_type:
             layer = MultiheadAttention(
-                out_dim, num_heads,
-                dropout=args.attention_dropout, self_attention=True,
+                out_dim,
+                num_heads,
+                dropout=args.attention_dropout,
+                self_attention=True,
             )
         else:
             raise NotImplementedError
-        
+
         return layer
 
     def upgrade_state_dict_named(self, state_dict, name):
@@ -650,17 +840,12 @@ class TransformerEncoderLayer(nn.Module):
         `...self_attn_layer_norm.weight` and `...layer_norms.1.weight` to
         `...final_layer_norm.weight`
         """
-        layer_norm_map = {
-            '0': 'self_attn_layer_norm',
-            '1': 'final_layer_norm'
-        }
+        layer_norm_map = {'0': 'self_attn_layer_norm', '1': 'final_layer_norm'}
         for old, new in layer_norm_map.items():
             for m in ('weight', 'bias'):
                 k = '{}.layer_norms.{}.{}'.format(name, old, m)
                 if k in state_dict:
-                    state_dict[
-                        '{}.{}.{}'.format(name, new, m)
-                    ] = state_dict[k]
+                    state_dict['{}.{}.{}'.format(name, new, m)] = state_dict[k]
                     del state_dict[k]
 
     def forward(self, x, attn_mask, encoder_padding_mask=None):
@@ -690,11 +875,13 @@ class TransformerEncoderLayer(nn.Module):
         # will become -inf, which results in NaN in model parameters
         # TODO: to formally solve this problem, we need to change fairseq's
         # MultiheadAttention. We will do this later on.
-        x, attn_score = self.self_attn(query=x, key=x, value=x, key_padding_mask=encoder_padding_mask)
+        x, attn_score = self.self_attn(
+            query=x, key=x, value=x, key_padding_mask=encoder_padding_mask
+        )
         x = F.dropout(x, p=self.dropout, training=self.training)
         x = residual + x
         x = self.maybe_layer_norm(self.self_attn_layer_norm, x, after=True)
-        
+
         residual = x
         x = self.maybe_layer_norm(self.final_layer_norm, x, before=True)
         x = self.activation_fn(self.fc1(x))
@@ -704,7 +891,8 @@ class TransformerEncoderLayer(nn.Module):
         x = residual + x
         x = self.maybe_layer_norm(self.final_layer_norm, x, after=True)
         import logging
-        #logging.info('x.shape={}, attn_score.shape.shape={}'.format(x.shape, attn_score.shape))
+
+        # logging.info('x.shape={}, attn_score.shape.shape={}'.format(x.shape, attn_score.shape))
         return x, attn_score
 
     def maybe_layer_norm(self, layer_norm, x, before=False, after=False):
@@ -732,11 +920,12 @@ class TransformerDecoderLayer(nn.Module):
             (default: False).
     """
 
-    def __init__(self, args, index, no_encoder_attn=False, add_bias_kv=False, add_zero_attn=False):
+    def __init__(
+        self, args, index, no_encoder_attn=False, add_bias_kv=False, add_zero_attn=False
+    ):
         super().__init__()
         self.embed_dim = args.decoder_embed_dim
         kernel_size = args.decoder_kernel_size_list[index]
-
 
         self.dropout = args.dropout
         self.activation_fn = utils.get_activation_fn(
@@ -765,11 +954,21 @@ class TransformerDecoderLayer(nn.Module):
             for layer_type in args.decoder_branch_type:
                 embed_dims.append(int(layer_type.split(':')[2]))
                 heads.append(int(layer_type.split(':')[3]))
-                layers.append(self.get_layer(args, index, embed_dims[-1], heads[-1], layer_type, add_bias_kv, add_zero_attn))
-            assert sum(embed_dims) == self.embed_dim, (sum(embed_dims), self.embed_dim)
+                layers.append(
+                    self.get_layer(
+                        args,
+                        index,
+                        embed_dims[-1],
+                        heads[-1],
+                        layer_type,
+                        add_bias_kv,
+                        add_zero_attn,
+                    )
+                )
+            assert sum(embed_dims) == self.embed_dim, (sum(
+                embed_dims), self.embed_dim)
 
             self.self_attn = MultiBranch(layers, embed_dims)
-        
 
         # use layerNorm rather than FusedLayerNorm for exporting.
         # char_inputs can be used to determint this.
@@ -790,17 +989,24 @@ class TransformerDecoderLayer(nn.Module):
                 encoder_decoder_attention=True,
             )
 
-            self.encoder_attn_layer_norm = LayerNorm(self.embed_dim, export=export)
+            self.encoder_attn_layer_norm = LayerNorm(
+                self.embed_dim, export=export)
 
-        self.fc1 = Linear(self.embed_dim, args.decoder_ffn_embed_dim, init=args.ffn_init)
-        self.fc2 = Linear(args.decoder_ffn_embed_dim, self.embed_dim, init=args.ffn_init)
+        self.fc1 = Linear(
+            self.embed_dim, args.decoder_ffn_embed_dim, init=args.ffn_init
+        )
+        self.fc2 = Linear(
+            args.decoder_ffn_embed_dim, self.embed_dim, init=args.ffn_init
+        )
         self.final_layer_norm = LayerNorm(self.embed_dim, export=export)
 
         self.need_attn = True
 
         self.onnx_trace = False
-    
-    def get_layer(self, args, index, out_dim, num_heads, layer_type, add_bias_kv, add_zero_attn):
+
+    def get_layer(
+        self, args, index, out_dim, num_heads, layer_type, add_bias_kv, add_zero_attn
+    ):
         kernel_size = layer_type.split(':')[1]
         if kernel_size == 'default':
             kernel_size = args.decoder_kernel_size_list[index]
@@ -809,15 +1015,23 @@ class TransformerDecoderLayer(nn.Module):
         layer_type = layer_type.split(':')[0]
         if layer_type == 'lightweight':
             layer = LightweightConv(
-                out_dim, kernel_size, padding_l=kernel_size-1,
-                weight_softmax=args.weight_softmax, num_heads=num_heads,
-                weight_dropout=args.weight_dropout, with_linear=args.conv_linear,
+                out_dim,
+                kernel_size,
+                padding_l=kernel_size - 1,
+                weight_softmax=args.weight_softmax,
+                num_heads=num_heads,
+                weight_dropout=args.weight_dropout,
+                with_linear=args.conv_linear,
             )
         elif layer_type == 'dynamic':
             layer = DynamicConv(
-                out_dim, kernel_size, padding_l=kernel_size-1,
-                weight_softmax=args.weight_softmax, num_heads=num_heads,
-                weight_dropout=args.weight_dropout, with_linear=args.conv_linear,
+                out_dim,
+                kernel_size,
+                padding_l=kernel_size - 1,
+                weight_softmax=args.weight_softmax,
+                num_heads=num_heads,
+                weight_dropout=args.weight_dropout,
+                with_linear=args.conv_linear,
                 glu=args.decoder_glu,
             )
         elif layer_type == 'attn':
@@ -862,7 +1076,7 @@ class TransformerDecoderLayer(nn.Module):
             if incremental_state is None:
                 incremental_state = {}
             prev_key, prev_value = prev_self_attn_state
-            saved_state = {"prev_key": prev_key, "prev_value": prev_value}
+            saved_state = {'prev_key': prev_key, 'prev_value': prev_value}
             self.self_attn._set_input_buffer(incremental_state, saved_state)
         x, attn = self.self_attn(
             query=x,
@@ -879,13 +1093,15 @@ class TransformerDecoderLayer(nn.Module):
 
         if self.encoder_attn is not None:
             residual = x
-            x = self.maybe_layer_norm(self.encoder_attn_layer_norm, x, before=True)
+            x = self.maybe_layer_norm(
+                self.encoder_attn_layer_norm, x, before=True)
             if prev_attn_state is not None:
                 if incremental_state is None:
                     incremental_state = {}
                 prev_key, prev_value = prev_attn_state
-                saved_state = {"prev_key": prev_key, "prev_value": prev_value}
-                self.encoder_attn._set_input_buffer(incremental_state, saved_state)
+                saved_state = {'prev_key': prev_key, 'prev_value': prev_value}
+                self.encoder_attn._set_input_buffer(
+                    incremental_state, saved_state)
             x, attn = self.encoder_attn(
                 query=x,
                 key=encoder_out,
@@ -897,7 +1113,8 @@ class TransformerDecoderLayer(nn.Module):
             )
             x = F.dropout(x, p=self.dropout, training=self.training)
             x = residual + x
-            x = self.maybe_layer_norm(self.encoder_attn_layer_norm, x, after=True)
+            x = self.maybe_layer_norm(
+                self.encoder_attn_layer_norm, x, after=True)
 
         residual = x
         x = self.maybe_layer_norm(self.final_layer_norm, x, before=True)
@@ -909,7 +1126,7 @@ class TransformerDecoderLayer(nn.Module):
         x = self.maybe_layer_norm(self.final_layer_norm, x, after=True)
         if self.onnx_trace and incremental_state is not None:
             saved_state = self.self_attn._get_input_buffer(incremental_state)
-            self_attn_state = saved_state["prev_key"], saved_state["prev_value"]
+            self_attn_state = saved_state['prev_key'], saved_state['prev_value']
             return x, attn, self_attn_state
         return x, attn
 
@@ -928,21 +1145,25 @@ def Linear(in_features, out_features, bias=True, init=None):
     m = nn.Linear(in_features, out_features, bias)
     nn.init.xavier_uniform_(m.weight) if init is None else init(m.weight)
     if bias:
-        nn.init.constant_(m.bias, 0.)
+        nn.init.constant_(m.bias, 0.0)
     return m
 
-def ratio_xavier_uniform_(tensor, ratio=2, gain=1.):
+
+def ratio_xavier_uniform_(tensor, ratio=2, gain=1.0):
     fan_in, fan_out = nn.init._calculate_fan_in_and_fan_out(tensor)
     fan_out = ratio * fan_in
     std = gain * math.sqrt(2.0 / float(fan_in + fan_out))
-    a = math.sqrt(3.0) * std  # Calculate uniform bounds from standard deviation
+    # Calculate uniform bounds from standard deviation
+    a = math.sqrt(3.0) * std
     return nn.init._no_grad_uniform_(tensor, -a, a)
+
 
 def Embedding(num_embeddings, embedding_dim, padding_idx):
     m = nn.Embedding(num_embeddings, embedding_dim, padding_idx=padding_idx)
-    nn.init.normal_(m.weight, mean=0, std=embedding_dim ** -0.5)
+    nn.init.normal_(m.weight, mean=0, std=embedding_dim**-0.5)
     nn.init.constant_(m.weight[padding_idx], 0)
     return m
+
 
 @register_model_architecture('transformer_multibranch_v2', 'transformer_multibranch_v2')
 def base_architecture(args):
@@ -951,57 +1172,97 @@ def base_architecture(args):
     args.encoder_ffn_embed_dim = getattr(args, 'encoder_ffn_embed_dim', 2048)
     args.encoder_layers = getattr(args, 'encoder_layers', 6)
     args.encoder_attention_heads = getattr(args, 'encoder_attention_heads', 8)
-    args.encoder_normalize_before = getattr(args, 'encoder_normalize_before', False)
+    args.encoder_normalize_before = getattr(
+        args, 'encoder_normalize_before', False)
     args.encoder_learned_pos = getattr(args, 'encoder_learned_pos', False)
     args.decoder_embed_path = getattr(args, 'decoder_embed_path', None)
-    args.decoder_embed_dim = getattr(args, 'decoder_embed_dim', args.encoder_embed_dim)
-    args.decoder_ffn_embed_dim = getattr(args, 'decoder_ffn_embed_dim', args.encoder_ffn_embed_dim)
+    args.decoder_embed_dim = getattr(
+        args, 'decoder_embed_dim', args.encoder_embed_dim)
+    args.decoder_ffn_embed_dim = getattr(
+        args, 'decoder_ffn_embed_dim', args.encoder_ffn_embed_dim
+    )
     args.decoder_layers = getattr(args, 'decoder_layers', 6)
     args.decoder_attention_heads = getattr(args, 'decoder_attention_heads', 8)
-    args.decoder_normalize_before = getattr(args, 'decoder_normalize_before', False)
+    args.decoder_normalize_before = getattr(
+        args, 'decoder_normalize_before', False)
     args.decoder_learned_pos = getattr(args, 'decoder_learned_pos', False)
-    args.attention_dropout = getattr(args, 'attention_dropout', 0.)
-    args.activation_dropout = getattr(args, 'activation_dropout', 0.)
+    args.attention_dropout = getattr(args, 'attention_dropout', 0.0)
+    args.activation_dropout = getattr(args, 'activation_dropout', 0.0)
     args.activation_fn = getattr(args, 'activation_fn', 'relu')
     args.dropout = getattr(args, 'dropout', 0.1)
-    args.adaptive_softmax_cutoff = getattr(args, 'adaptive_softmax_cutoff', None)
-    args.adaptive_softmax_dropout = getattr(args, 'adaptive_softmax_dropout', 0)
-    args.share_decoder_input_output_embed = getattr(args, 'share_decoder_input_output_embed', False)
+    args.adaptive_softmax_cutoff = getattr(
+        args, 'adaptive_softmax_cutoff', None)
+    args.adaptive_softmax_dropout = getattr(
+        args, 'adaptive_softmax_dropout', 0)
+    args.share_decoder_input_output_embed = getattr(
+        args, 'share_decoder_input_output_embed', False
+    )
     args.share_all_embeddings = getattr(args, 'share_all_embeddings', False)
-    args.no_token_positional_embeddings = getattr(args, 'no_token_positional_embeddings', False)
+    args.no_token_positional_embeddings = getattr(
+        args, 'no_token_positional_embeddings', False
+    )
     args.adaptive_input = getattr(args, 'adaptive_input', False)
 
-    args.decoder_input_dim = getattr(args, 'decoder_input_dim', args.decoder_embed_dim)
+    args.decoder_input_dim = getattr(
+        args, 'decoder_input_dim', args.decoder_embed_dim)
 
-    args.encoder_kernel_size_list = getattr(args, 'encoder_kernel_size_list', [3, 7, 15, 31, 31, 31])
-    args.decoder_kernel_size_list = getattr(args, 'decoder_kernel_size_list', [3, 7, 15, 31, 31, 31])
+    args.encoder_kernel_size_list = getattr(
+        args, 'encoder_kernel_size_list', [3, 7, 15, 31, 31, 31]
+    )
+    args.decoder_kernel_size_list = getattr(
+        args, 'decoder_kernel_size_list', [3, 7, 15, 31, 31, 31]
+    )
     if len(args.encoder_kernel_size_list) == 1:
-        args.encoder_kernel_size_list = args.encoder_kernel_size_list * args.encoder_layers
+        args.encoder_kernel_size_list = (
+            args.encoder_kernel_size_list * args.encoder_layers
+        )
     elif len(args.encoder_kernel_size_list) > args.encoder_layers:
-        args.encoder_kernel_size_list = args.encoder_kernel_size_list[:args.encoder_layers]
-        
+        args.encoder_kernel_size_list = args.encoder_kernel_size_list[
+            : args.encoder_layers
+        ]
+
     if len(args.decoder_kernel_size_list) == 1:
-        args.decoder_kernel_size_list = args.decoder_kernel_size_list * args.decoder_layers
+        args.decoder_kernel_size_list = (
+            args.decoder_kernel_size_list * args.decoder_layers
+        )
     elif len(args.decoder_kernel_size_list) > args.decoder_layers:
-        args.decoder_kernel_size_list = args.decoder_kernel_size_list[:args.decoder_layers]
-    
-    assert len(args.encoder_kernel_size_list) == args.encoder_layers, "encoder_kernel_size_list doesn't match encoder_layers"
-    assert len(args.decoder_kernel_size_list) == args.decoder_layers, "decoder_kernel_size_list doesn't match decoder_layers"
+        args.decoder_kernel_size_list = args.decoder_kernel_size_list[
+            : args.decoder_layers
+        ]
+
+    assert (
+        len(args.encoder_kernel_size_list) == args.encoder_layers
+    ), "encoder_kernel_size_list doesn't match encoder_layers"
+    assert (
+        len(args.decoder_kernel_size_list) == args.decoder_layers
+    ), "decoder_kernel_size_list doesn't match decoder_layers"
     args.encoder_glu = getattr(args, 'encoder_glu', True)
     args.decoder_glu = getattr(args, 'decoder_glu', True)
     args.input_dropout = getattr(args, 'input_dropout', 0.1)
-    args.weight_dropout = getattr(args, 'weight_dropout', args.attention_dropout)
+    args.weight_dropout = getattr(
+        args, 'weight_dropout', args.attention_dropout)
 
     args.tie_adaptive_weights = getattr(args, 'tie_adaptive_weights', None)
 
     print(args.encoder_ffn_list)
 
-    args.encoder_ffn_list = args.encoder_ffn_list * args.encoder_layers if len(args.encoder_ffn_list) == 1 else args.encoder_ffn_list
-    args.decoder_ffn_list = args.decoder_ffn_list * args.decoder_layers if len(args.decoder_ffn_list) == 1 else args.decoder_ffn_list
+    args.encoder_ffn_list = (
+        args.encoder_ffn_list * args.encoder_layers
+        if len(args.encoder_ffn_list) == 1
+        else args.encoder_ffn_list
+    )
+    args.decoder_ffn_list = (
+        args.decoder_ffn_list * args.decoder_layers
+        if len(args.decoder_ffn_list) == 1
+        else args.decoder_ffn_list
+    )
 
     args.ffn_init = getattr(args, 'ffn_init', None)
 
-@register_model_architecture('transformer_multibranch_v2', 'transformer_multibranch_v2_iwslt_de_en')
+
+@register_model_architecture(
+    'transformer_multibranch_v2', 'transformer_multibranch_v2_iwslt_de_en'
+)
 def transformer_iwslt_de_en(args):
     args.encoder_embed_dim = getattr(args, 'encoder_embed_dim', 512)
     args.encoder_ffn_embed_dim = getattr(args, 'encoder_ffn_embed_dim', 1024)
@@ -1015,18 +1276,23 @@ def transformer_iwslt_de_en(args):
     base_architecture(args)
 
 
-@register_model_architecture('transformer_multibranch_v2', 'transformer_multibranch_v2_wmt_en_de')
+@register_model_architecture(
+    'transformer_multibranch_v2', 'transformer_multibranch_v2_wmt_en_de'
+)
 def transformer_wmt_en_de(args):
     base_architecture(args)
 
 
 # parameters used in the "Attention Is All You Need" paper (Vaswani et al., 2017)
-@register_model_architecture('transformer_multibranch_v2', 'transformer_multibranch_v2_vaswani_wmt_en_de_big')
+@register_model_architecture(
+    'transformer_multibranch_v2', 'transformer_multibranch_v2_vaswani_wmt_en_de_big'
+)
 def transformer_vaswani_wmt_en_de_big(args):
     args.encoder_embed_dim = getattr(args, 'encoder_embed_dim', 1024)
     args.encoder_ffn_embed_dim = getattr(args, 'encoder_ffn_embed_dim', 4096)
     args.encoder_attention_heads = getattr(args, 'encoder_attention_heads', 16)
-    args.encoder_normalize_before = getattr(args, 'encoder_normalize_before', False)
+    args.encoder_normalize_before = getattr(
+        args, 'encoder_normalize_before', False)
     args.decoder_embed_dim = getattr(args, 'decoder_embed_dim', 1024)
     args.decoder_ffn_embed_dim = getattr(args, 'decoder_ffn_embed_dim', 4096)
     args.decoder_attention_heads = getattr(args, 'decoder_attention_heads', 16)
@@ -1034,24 +1300,31 @@ def transformer_vaswani_wmt_en_de_big(args):
     base_architecture(args)
 
 
-@register_model_architecture('transformer_multibranch_v2', 'transformer_multibranch_v2_vaswani_wmt_en_fr_big')
+@register_model_architecture(
+    'transformer_multibranch_v2', 'transformer_multibranch_v2_vaswani_wmt_en_fr_big'
+)
 def transformer_vaswani_wmt_en_fr_big(args):
     args.dropout = getattr(args, 'dropout', 0.1)
     transformer_vaswani_wmt_en_de_big(args)
 
 
-@register_model_architecture('transformer_multibranch_v2', 'transformer_multibranch_v2_wmt_en_de_big')
+@register_model_architecture(
+    'transformer_multibranch_v2', 'transformer_multibranch_v2_wmt_en_de_big'
+)
 def transformer_wmt_en_de_big(args):
     args.attention_dropout = getattr(args, 'attention_dropout', 0.1)
     transformer_vaswani_wmt_en_de_big(args)
 
 
 # default parameters used in tensor2tensor implementation
-@register_model_architecture('transformer_multibranch_v2', 'transformer_multibranch_v2_wmt_en_de_big_t2t')
+@register_model_architecture(
+    'transformer_multibranch_v2', 'transformer_multibranch_v2_wmt_en_de_big_t2t'
+)
 def transformer_wmt_en_de_big_t2t(args):
-    args.encoder_normalize_before = getattr(args, 'encoder_normalize_before', True)
-    args.decoder_normalize_before = getattr(args, 'decoder_normalize_before', True)
+    args.encoder_normalize_before = getattr(
+        args, 'encoder_normalize_before', True)
+    args.decoder_normalize_before = getattr(
+        args, 'decoder_normalize_before', True)
     args.attention_dropout = getattr(args, 'attention_dropout', 0.1)
     args.activation_dropout = getattr(args, 'activation_dropout', 0.1)
     transformer_vaswani_wmt_en_de_big(args)
-

@@ -1,10 +1,13 @@
-import re
 import itertools
+import re
+
 import datasets
 
 
 class EncodedInput(object):
-    def __init__(self, token_ids, segment_ids, position_ids, attn_mask, overflow_token_ids):
+    def __init__(
+        self, token_ids, segment_ids, position_ids, attn_mask, overflow_token_ids
+    ):
         self.token_ids = token_ids
         self.segment_ids = segment_ids
         self.position_ids = position_ids
@@ -39,25 +42,40 @@ class BaseTokenizer(object):
             tokenized_text = []
             for sub_text in text_list:
                 if sub_text not in self.special_tokens:
-                    tokenized_text += self._split_on_special_token(tok, sub_text)
+                    tokenized_text += self._split_on_special_token(
+                        tok, sub_text)
                 else:
                     tokenized_text += [sub_text]
             text_list = tokenized_text
 
-        return list(itertools.chain.from_iterable([
-            self._tokenize(token) if token not in self.special_tokens else [token] for token in tokenized_text]))
+        return list(
+            itertools.chain.from_iterable(
+                [
+                    self._tokenize(token)
+                    if token not in self.special_tokens
+                    else [token]
+                    for token in tokenized_text
+                ]
+            )
+        )
 
     def encode(self, text_a, text_b=None, added_trunc_size=None):
         token_ids_a = self._get_input_ids(text_a)
-        token_ids_b = self._get_input_ids(text_b) if text_b is not None else None
-        token_ids_a, token_ids_b, overflow_token_ids = self._truncate_tokens(token_ids_a, token_ids_b, added_trunc_size)
-        token_ids, segment_ids, position_ids, attn_mask = self._combine_and_pad(token_ids_a, token_ids_b)
-        encoded_input = EncodedInput(token_ids, segment_ids, position_ids, attn_mask, overflow_token_ids)
+        token_ids_b = self._get_input_ids(
+            text_b) if text_b is not None else None
+        token_ids_a, token_ids_b, overflow_token_ids = self._truncate_tokens(
+            token_ids_a, token_ids_b, added_trunc_size
+        )
+        token_ids, segment_ids, position_ids, attn_mask = self._combine_and_pad(
+            token_ids_a, token_ids_b
+        )
+        encoded_input = EncodedInput(
+            token_ids, segment_ids, position_ids, attn_mask, overflow_token_ids
+        )
         return encoded_input
 
     def decode(self, token_ids, clean_up_tokenization_spaces=True):
-        """ Converts a sequence of token ids in a string.
-        """
+        """Converts a sequence of token ids in a string."""
         filtered_tokens = self._ids_to_tokens(token_ids)
 
         # To avoid mixing byte-level and unicode for byte-level BPT
@@ -79,7 +97,8 @@ class BaseTokenizer(object):
 
     def _lowercase_text(self, text):
         # convert non-special tokens to lowercase
-        escaped_special_toks = [re.escape(s_tok) for s_tok in self.special_tokens]
+        escaped_special_toks = [re.escape(s_tok)
+                                for s_tok in self.special_tokens]
         pattern = r'(' + r'|'.join(escaped_special_toks) + r')|' + r'(.+?)'
         return re.sub(pattern, lambda m: m.groups()[0] or m.groups()[1].lower(), text)
 
@@ -102,26 +121,43 @@ class BaseTokenizer(object):
     def _get_input_ids(self, text):
         if isinstance(text, str):
             return self._tokens_to_ids(self.tokenize(text))
-        elif isinstance(text, (list, tuple)) and len(text) > 0 and isinstance(text[0], str):
+        elif (
+            isinstance(text, (list, tuple))
+            and len(text) > 0
+            and isinstance(text[0], str)
+        ):
             return self._tokens_to_ids(text)
-        elif isinstance(text, (list, tuple)) and len(text) > 0 and isinstance(text[0], int):
+        elif (
+            isinstance(text, (list, tuple))
+            and len(text) > 0
+            and isinstance(text[0], int)
+        ):
             return text
         else:
-            raise ValueError('Input is not valid, should be a string, a list/tuple of strings or a list/tuple of integers.')
+            raise ValueError(
+                'Input is not valid, should be a string, a list/tuple of strings or a list/tuple of integers.'
+            )
 
     def _truncate_tokens(self, token_ids_a, token_ids_b, added_trunc_size=None):
         overflow_token_ids = None
         if self.task in datasets.glue_tasks:
-            token_ids_a, token_ids_b = self._truncate_glue(token_ids_a, token_ids_b)
+            token_ids_a, token_ids_b = self._truncate_glue(
+                token_ids_a, token_ids_b)
             return token_ids_a, token_ids_b, overflow_token_ids
         elif self.task in datasets.squad_tasks:
-            token_ids_a, token_ids_b, overflow_token_ids = self._truncate_squad(token_ids_a, token_ids_b, added_trunc_size)
+            token_ids_a, token_ids_b, overflow_token_ids = self._truncate_squad(
+                token_ids_a, token_ids_b, added_trunc_size
+            )
             return token_ids_a, token_ids_b, overflow_token_ids
         elif self.task in datasets.multi_choice_tasks:
-            token_ids_a, token_ids_b = self._truncate_multi_choice(token_ids_a, token_ids_b)
+            token_ids_a, token_ids_b = self._truncate_multi_choice(
+                token_ids_a, token_ids_b
+            )
             return token_ids_a, token_ids_b, overflow_token_ids
         elif self.task in datasets.summarization_tasks:
-            token_ids_a, token_ids_b = self._truncate_summarization(token_ids_a, token_ids_b)
+            token_ids_a, token_ids_b = self._truncate_summarization(
+                token_ids_a, token_ids_b
+            )
             return token_ids_a, token_ids_b, overflow_token_ids
 
     def _truncate_glue(self, token_ids_a, token_ids_b):
@@ -183,17 +219,16 @@ class BaseTokenizer(object):
 
     @staticmethod
     def _clean_up_tokenization(out_string):
-        """ Clean up a list of simple English tokenization artifacts like spaces before punctuations and abreviated forms.
-        """
+        """Clean up a list of simple English tokenization artifacts like spaces before punctuations and abreviated forms."""
         out_string = (
-            out_string.replace(" .", ".")
-            .replace(" ?", "?")
-            .replace(" !", "!")
-            .replace(" ,", ",")
+            out_string.replace(' .', '.')
+            .replace(' ?', '?')
+            .replace(' !', '!')
+            .replace(' ,', ',')
             .replace(" ' ", "'")
             .replace(" n't", "n't")
             .replace(" 'm", "'m")
-            .replace(" do not", " don't")
+            .replace(' do not', " don't")
             .replace(" 's", "'s")
             .replace(" 've", "'ve")
             .replace(" 're", "'re")

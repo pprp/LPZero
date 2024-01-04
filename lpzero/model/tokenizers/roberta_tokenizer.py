@@ -1,8 +1,9 @@
-import torch
-import regex as re
 import json
-import tokenizers
 from functools import lru_cache
+
+import regex as re
+import tokenizers
+import torch
 
 
 @lru_cache()
@@ -17,7 +18,11 @@ def bytes_to_unicodes():
     This is a signficant percentage of your normal, say, 32K bpe vocab.
     To avoid that, we want lookup tables between utf-8 bytes and unicode strings.
     """
-    bytes = list(range(ord('!'), ord('~') + 1))+list(range(ord('¡'), ord('¬') + 1))+list(range(ord('®'), ord('ÿ') + 1))
+    bytes = (
+        list(range(ord('!'), ord('~') + 1))
+        + list(range(ord('¡'), ord('¬') + 1))
+        + list(range(ord('®'), ord('ÿ') + 1))
+    )
     unicodes = bytes[:]
     n = 0
     for b in range(2**8):
@@ -43,8 +48,17 @@ def get_pairs(word):
 
 
 class RobertaBasicTokenizer(tokenizers.BaseTokenizer):
-    def __init__(self, lowercase, vocab_path, merge_path, unk_token='<unk>', sep_token='</s>', pad_token='<pad>',
-                 cls_token='<s>', mask_token='<mask>'):
+    def __init__(
+        self,
+        lowercase,
+        vocab_path,
+        merge_path,
+        unk_token='<unk>',
+        sep_token='</s>',
+        pad_token='<pad>',
+        cls_token='<s>',
+        mask_token='<mask>',
+    ):
         super(RobertaBasicTokenizer, self).__init__(lowercase)
 
         with open(vocab_path, encoding='utf-8') as f:
@@ -61,14 +75,22 @@ class RobertaBasicTokenizer(tokenizers.BaseTokenizer):
 
         self.cache = {}
         # Should haved added re.IGNORECASE so BPE merges can happen for capitalized versions of contractions
-        self.pattern = re.compile(r"""'s|'t|'re|'ve|'m|'ll|'d| ?\p{L}+| ?\p{N}+| ?[^\s\p{L}\p{N}]+|\s+(?!\S)|\s+""")
+        self.pattern = re.compile(
+            r"""'s|'t|'re|'ve|'m|'ll|'d| ?\p{L}+| ?\p{N}+| ?[^\s\p{L}\p{N}]+|\s+(?!\S)|\s+"""
+        )
 
         self.unk_token = unk_token
         self.sep_token = sep_token
         self.pad_token = pad_token
         self.cls_token = cls_token
         self.mask_token = mask_token
-        self.special_tokens = {self.unk_token, self.sep_token, self.pad_token, self.cls_token, self.mask_token}
+        self.special_tokens = {
+            self.unk_token,
+            self.sep_token,
+            self.pad_token,
+            self.cls_token,
+            self.mask_token,
+        }
 
         self.unk_token_id = self.vocab_map.get(self.unk_token)
         self.sep_token_id = self.vocab_map.get(self.sep_token)
@@ -79,8 +101,12 @@ class RobertaBasicTokenizer(tokenizers.BaseTokenizer):
     def _tokenize(self, text):
         bpe_tokens = []
         for token in re.findall(self.pattern, text):
-            token = ''.join(self.byte_encoder[b] for b in token.encode('utf-8')) # Maps all our bytes to unicode strings, avoiding controle tokens of the BPE (spaces in our case)
-            bpe_tokens.extend(bpe_token for bpe_token in self._byte_level_tokenize(token).split(' '))
+            token = ''.join(
+                self.byte_encoder[b] for b in token.encode('utf-8')
+            )  # Maps all our bytes to unicode strings, avoiding controle tokens of the BPE (spaces in our case)
+            bpe_tokens.extend(
+                bpe_token for bpe_token in self._byte_level_tokenize(token).split(' ')
+            )
         return bpe_tokens
 
     def _byte_level_tokenize(self, token):
@@ -92,7 +118,8 @@ class RobertaBasicTokenizer(tokenizers.BaseTokenizer):
             return token
 
         while True:
-            bigram = min(pairs, key=lambda pair: self.bpe_ranks.get(pair, float("inf")))
+            bigram = min(pairs, key=lambda pair: self.bpe_ranks.get(
+                pair, float('inf')))
             if bigram not in self.bpe_ranks:
                 break
             first, second = bigram
@@ -127,7 +154,8 @@ class RobertaBasicTokenizer(tokenizers.BaseTokenizer):
     def _tokens_to_ids(self, tokens):
         ids = []
         for token in tokens:
-            token_id = self.vocab_map.get(token, self.vocab_map.get(self.unk_token))
+            token_id = self.vocab_map.get(
+                token, self.vocab_map.get(self.unk_token))
             ids.append(token_id)
         return ids
 
@@ -140,13 +168,18 @@ class RobertaBasicTokenizer(tokenizers.BaseTokenizer):
 
     def _tokens_to_string(self, tokens):
         text = ''.join(tokens)
-        text = bytearray([self.byte_decoder[c] for c in text]).decode('utf-8', errors='replace')
+        text = bytearray([self.byte_decoder[c] for c in text]).decode(
+            'utf-8', errors='replace'
+        )
         return text
 
 
 class RobertaTokenizer(RobertaBasicTokenizer):
-    def __init__(self, lowercase, task, vocab_path, merge_path, max_seq_len, max_query_len=None):
-        super(RobertaTokenizer, self).__init__(lowercase, vocab_path, merge_path)
+    def __init__(
+        self, lowercase, task, vocab_path, merge_path, max_seq_len, max_query_len=None
+    ):
+        super(RobertaTokenizer, self).__init__(
+            lowercase, vocab_path, merge_path)
 
         self.task = task
         self.max_seq_len = max_seq_len
@@ -162,7 +195,8 @@ class RobertaTokenizer(RobertaBasicTokenizer):
         token_ids = [self.cls_token_id] + token_ids_a + [self.sep_token_id]
         segment_ids = [0] * len(token_ids)  # Will not be used in roberta model
         if token_ids_b is not None:
-            token_ids += [self.sep_token_id] + token_ids_b + [self.sep_token_id]
+            token_ids += [self.sep_token_id] + \
+                token_ids_b + [self.sep_token_id]
             segment_ids += [0] + [1] * len(token_ids_b + [self.sep_token_id])
         attn_mask = [0] * len(token_ids)
 

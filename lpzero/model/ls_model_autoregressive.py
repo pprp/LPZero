@@ -5,14 +5,14 @@
 # LICENSE file in the root directory of this source tree.
 
 import math
-import models
 
+import models
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
-
-from fairseq.modules.layer_norm import LayerNorm
 from fairseq.modules.gelu import gelu
+from fairseq.modules.layer_norm import LayerNorm
+
 from .ls_layer import ChunkedLSAttention
 
 
@@ -23,7 +23,7 @@ class PositionalEmbedding(nn.Module):
         self.demb = demb
 
         inv_freq = 1 / (10000 ** (torch.arange(0.0, demb, 2.0) / demb))
-        self.register_buffer("inv_freq", inv_freq)
+        self.register_buffer('inv_freq', inv_freq)
 
     def forward(self, pos_seq, bsz=None):
         sinusoid_inp = torch.ger(pos_seq, self.inv_freq)
@@ -63,16 +63,32 @@ class TransformerLSLayer(nn.Module):
         self.use_lm = use_lm
 
         self.attn = ChunkedLSAttention(
-            d_model=config.d_model, n_head=config.n_head,
-            chunk_size=config.chunk_size, chunk_rank=config.chunk_rank, window_len=config.window_len,
-            dropout=config.dropout, grad_chk=config.grad_chk, use_bias=config.use_bias, probing=config.probing)
+            d_model=config.d_model,
+            n_head=config.n_head,
+            chunk_size=config.chunk_size,
+            chunk_rank=config.chunk_rank,
+            window_len=config.window_len,
+            dropout=config.dropout,
+            grad_chk=config.grad_chk,
+            use_bias=config.use_bias,
+            probing=config.probing,
+        )
         self.norm1 = LayerNorm(config.d_model, export=config.probing)
-        self.ff = FeedForwardLayer(d_model=config.d_model, d_inner=config.d_inner, dropout=config.dropout, use_gelu=config.use_gelu)
+        self.ff = FeedForwardLayer(
+            d_model=config.d_model,
+            d_inner=config.d_inner,
+            dropout=config.dropout,
+            use_gelu=config.use_gelu,
+        )
         self.norm2 = LayerNorm(config.d_model, export=config.probing)
         if self.use_lm:
-            self.lm_head = models.BertMaskedLMHead(config, self.embeddings.token_embeddings.weight)
+            self.lm_head = models.BertMaskedLMHead(
+                config, self.embeddings.token_embeddings.weight
+            )
 
-    def forward(self, h, h_cache, key_pe, pos_embed_window, attn_mask=None, chunk_attn_mask=None):
+    def forward(
+        self, h, h_cache, key_pe, pos_embed_window, attn_mask=None, chunk_attn_mask=None
+    ):
         # h = B x M x H
         # h_cache = B x L x H
 
@@ -80,7 +96,8 @@ class TransformerLSLayer(nn.Module):
             h = self.norm1(h)
             h_cache = self.norm1(h_cache)
 
-        attn_out = self.attn(h, h_cache, key_pe, pos_embed_window, chunk_attn_mask)
+        attn_out = self.attn(h, h_cache, key_pe,
+                             pos_embed_window, chunk_attn_mask)
 
         if self.pre_ln:
             h = h + attn_out
@@ -126,7 +143,7 @@ class TransformerLSModel(nn.Module):
         nn.Module.__init__(self)
         # token embeddings
         self.in_emb = nn.Embedding(vocab_size, d_model)
-        nn.init.normal_(self.in_emb.weight, mean=0, std=d_model ** -0.5)
+        nn.init.normal_(self.in_emb.weight, mean=0, std=d_model**-0.5)
         self.pos_emb = PositionalEmbedding(d_model)
         # nn.init.uniform_(self.in_emb.weight, -0.01, 0.01)
         self.out_emb = nn.Linear(d_model, vocab_size)
@@ -176,33 +193,46 @@ class TransformerLSModel(nn.Module):
     def forward(self, x, h_cache, target=None):
         # x size = B x M
         padded = False
-        if self.chunk_size > 0 and (x.shape[1] % self.chunk_size ):
+        if self.chunk_size > 0 and (x.shape[1] % self.chunk_size):
             # or x.shape[1] % self.window_len
             # usually happens at the end
             # ad-hoc solution for the chunking issue during evaluation
             orig_seqlen = x.shape[1]
-            pad_multip = abs(self.chunk_size * self.window_len) // math.gcd(self.chunk_size, self.window_len)
+            pad_multip = abs(self.chunk_size * self.window_len) // math.gcd(
+                self.chunk_size, self.window_len
+            )
             n_pad = pad_multip - x.shape[1] % pad_multip
             x = F.pad(x, (0, n_pad))
             padded = True
 
         block_size = x.size(1)
-        h = self.in_emb(x) #.mul_(self.d_model ** 0.5)  # B x M x H
-        h.mul_(self.d_model ** 0.5)
+        h = self.in_emb(x)  # .mul_(self.d_model ** 0.5)  # B x M x H
+        h.mul_(self.d_model**0.5)
 
         mlen = h_cache[0].shape[1]
         klen = h.shape[1] + mlen
 
         dec_attn_mask = None
-        pos_seq = torch.arange(self.window_len - 1, -1, -1.0, device=h.device, dtype=h.dtype)
+        pos_seq = torch.arange(
+            self.window_len - 1, -1, -1.0, device=h.device, dtype=h.dtype
+        )
 
         n_chunk_vecs = klen // self.chunk_size * self.chunk_rank
         n_chunks = klen // self.chunk_size
         n_mem_chunks = mlen // self.chunk_size
-        chunk_attn_mask = torch.triu(h.new_ones((x.shape[1]//self.chunk_size, n_chunks), dtype=torch.bool), diagonal=n_mem_chunks)[
-                        None, None, :, None, :, None]
-        chunk_attn_mask = chunk_attn_mask.expand(-1, -1, -1, -1, -1, self.chunk_rank).contiguous().view(1, 1, -1, 1, n_chunks*self.chunk_rank)
-        pos_chunk_ids = torch.arange(n_chunk_vecs - 1, -1, -1.0, device=h.device, dtype=h.dtype)
+        chunk_attn_mask = torch.triu(
+            h.new_ones((x.shape[1] // self.chunk_size,
+                       n_chunks), dtype=torch.bool),
+            diagonal=n_mem_chunks,
+        )[None, None, :, None, :, None]
+        chunk_attn_mask = (
+            chunk_attn_mask.expand(-1, -1, -1, -1, -1, self.chunk_rank)
+            .contiguous()
+            .view(1, 1, -1, 1, n_chunks * self.chunk_rank)
+        )
+        pos_chunk_ids = torch.arange(
+            n_chunk_vecs - 1, -1, -1.0, device=h.device, dtype=h.dtype
+        )
         if self.cpos_clamp_len > 0:
             pos_chunk_ids.clamp_(max=self.cpos_clamp_len)
         pos_chunks = self.pos_emb(pos_chunk_ids)
@@ -220,12 +250,14 @@ class TransformerLSModel(nn.Module):
             cache_size = self.mem_len
             if cache_size > block_size:
                 h_cache_next_l = torch.cat(
-                    [h_cache[l][:, -cache_size + block_size :, :], h], dim=1
+                    [h_cache[l][:, -cache_size + block_size:, :], h], dim=1
                 ).detach()
             else:
                 h_cache_next_l = h[:, -cache_size:, :].detach()
             h_cache_next.append(h_cache_next_l)
-            h = layer(h, h_cache[l], pos_chunks, pos_emb, dec_attn_mask, chunk_attn_mask)  # B x M x H
+            h = layer(
+                h, h_cache[l], pos_chunks, pos_emb, dec_attn_mask, chunk_attn_mask
+            )  # B x M x H
 
         if self.emb_dropout is not None:
             h = self.emb_dropout(h)
@@ -259,9 +291,9 @@ class TransformerLSModel(nn.Module):
         return avg_span / len(self.layers)
 
     def _init_weight(self, weight):
-        if self.init == "uniform":
+        if self.init == 'uniform':
             nn.init.uniform_(weight, -self.init_range, self.init_range)
-        elif self.init == "normal":
+        elif self.init == 'normal':
             nn.init.normal_(weight, 0.0, self.init_std)
 
     def _init_bias(self, bias):
@@ -270,32 +302,32 @@ class TransformerLSModel(nn.Module):
     def _init_weights(self, m):
         """Initialize the weights."""
         classname = m.__class__.__name__
-        if classname.find("Linear") != -1:
-            if hasattr(m, "weight") and m.weight is not None:
+        if classname.find('Linear') != -1:
+            if hasattr(m, 'weight') and m.weight is not None:
                 self._init_weight(m.weight)
-            if hasattr(m, "bias") and m.bias is not None:
+            if hasattr(m, 'bias') and m.bias is not None:
                 self._init_bias(m.bias)
-        elif classname.find("Embedding") != -1:
-            if hasattr(m, "weight"):
+        elif classname.find('Embedding') != -1:
+            if hasattr(m, 'weight'):
                 self._init_weight(m.weight)
-        elif classname.find("LayerNorm") != -1:
-            if hasattr(m, "weight"):
+        elif classname.find('LayerNorm') != -1:
+            if hasattr(m, 'weight'):
                 nn.init.normal_(m.weight, 1.0, self.init_std)
-            if hasattr(m, "bias") and m.bias is not None:
+            if hasattr(m, 'bias') and m.bias is not None:
                 self._init_bias(m.bias)
         else:
             hit = False
-            if hasattr(m, "r_emb"):
+            if hasattr(m, 'r_emb'):
                 self._init_weight(m.r_emb)
                 hit = True
-            if hasattr(m, "r_w_bias"):
+            if hasattr(m, 'r_w_bias'):
                 self._init_weight(m.r_w_bias)
                 hit = True
-            if hasattr(m, "r_r_bias"):
+            if hasattr(m, 'r_r_bias'):
                 self._init_weight(m.r_r_bias)
                 hit = True
-            if hasattr(m, "r_bias"):
+            if hasattr(m, 'r_bias'):
                 self._init_bias(m.r_bias)
                 hit = True
             if not hit:
-                print("Missing {}".format(classname))
+                print('Missing {}'.format(classname))

@@ -1,4 +1,3 @@
-from loguru import logger
 import argparse
 import csv
 import json
@@ -13,7 +12,9 @@ import matplotlib.pyplot as plt
 import numpy as np
 import torch
 from datasets import load_dataset
+from loguru import logger
 from torch import Tensor
+from transformers import ElectraTokenizerFast
 
 from lpzero.model.flexibert.modeling_electra import (
     ElectraConfig,
@@ -22,7 +23,6 @@ from lpzero.model.flexibert.modeling_electra import (
 )
 from lpzero.structures import GraphStructure, LinearStructure, TreeStructure
 from lpzero.utils.rank_consistency import spearman
-from transformers import ElectraTokenizerFast
 
 configs = []
 with open('./data/BERT_benchmark.json', 'r') as f:
@@ -61,8 +61,8 @@ def parse_args():
         type=int,
         help='population size should be larger than 10',
     )
-    
-    # log path 
+
+    # log path
     parser.add_argument(
         '--log_path',
         default='./logs/evo_search_run0.log',
@@ -72,13 +72,14 @@ def parse_args():
     # num_sample
     parser.add_argument(
         '--num_sample',
-        default=50, 
-        type=int, 
+        default=50,
+        type=int,
         help='number of sample to be evaluate the ranking consistency',
     )
 
     args = parser.parse_args()
-    return args 
+    return args
+
 
 args = parse_args()
 
@@ -190,7 +191,10 @@ def evolution_search(inputs, structure, iterations=1000, popu_size=50):
     # run the cycle
     logger.info('Begin the evolution process...')
     for i in range(iterations):
-        scores = [fitness_spearman(inputs, struct, num_sample=args.num_sample) for struct in population]
+        scores = [
+            fitness_spearman(inputs, struct, num_sample=args.num_sample)
+            for struct in population
+        ]
         # select the best one from the population
         scores = np.array(scores)
         argidxs = np.argsort(scores)[::-1]
@@ -239,7 +243,9 @@ def evolution_search(inputs, structure, iterations=1000, popu_size=50):
             population) == popu_size, f'Population size should be {popu_size}'
 
     # evaluate the fitness of all structures
-    scores = [fitness_spearman(inputs, s, num_sample=args.num_sample) for s in population]
+    scores = [
+        fitness_spearman(inputs, s, num_sample=args.num_sample) for s in population
+    ]
     argidxs = np.argsort(scores)[::-1]
     running_struct = population[argidxs[0]]
     logger.info(
@@ -287,10 +293,7 @@ def generate_inputs():
     return inputs
 
 
-
 if __name__ == '__main__':
-    
-
     inputs = generate_inputs()
 
     # preprocess search space structure

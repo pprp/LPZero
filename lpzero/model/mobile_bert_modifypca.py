@@ -1,18 +1,20 @@
+import logging
+import math
+
+import datasets
+import models
+import numpy as np
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
-import math
-import datasets
-import models
 from sklearn.decomposition import PCA
-import numpy as np
-from .cka import CKA_Minibatch_Grid
-from .pca_torch import pca_torch
-from .dynamic_ops import DynamicLinear
-import logging
 
-#device = torch.device('cuda:5')
-#cuda_cka = CudaCKA(device)
+from .cka import CKA_Minibatch_Grid
+from .dynamic_ops import DynamicLinear
+from .pca_torch import pca_torch
+
+# device = torch.device('cuda:5')
+# cuda_cka = CudaCKA(device)
 
 
 class NoNorm(nn.Module):
@@ -29,19 +31,32 @@ class MobileBertEmbedding(nn.Module):
     def __init__(self, config):
         super(MobileBertEmbedding, self).__init__()
 
-        self.token_embeddings = nn.Embedding(config.vocab_size, config.embed_size, padding_idx=config.pad_token_id)
-        self.segment_embeddings = nn.Embedding(config.segment_size, config.hidden_size)
-        self.position_embeddings = nn.Embedding(config.position_size, config.hidden_size)
+        self.token_embeddings = nn.Embedding(
+            config.vocab_size, config.embed_size, padding_idx=config.pad_token_id
+        )
+        self.segment_embeddings = nn.Embedding(
+            config.segment_size, config.hidden_size)
+        self.position_embeddings = nn.Embedding(
+            config.position_size, config.hidden_size
+        )
         self.dense = nn.Linear(config.embed_size * 3, config.hidden_size)
-        self.layernorm = nn.LayerNorm(config.hidden_size) if not config.use_opt else NoNorm(config.hidden_size)
+        self.layernorm = (
+            nn.LayerNorm(config.hidden_size)
+            if not config.use_opt
+            else NoNorm(config.hidden_size)
+        )
         self.dropout = nn.Dropout(config.hidden_dropout_prob)
 
     def forward(self, token_ids, segment_ids, position_ids):
         token_embeddings = self.token_embeddings(token_ids)
-        token_embeddings = torch.cat([
-            F.pad(token_embeddings[:, 1:], [0, 0, 0, 1, 0, 0], value=0),
-            token_embeddings,
-            F.pad(token_embeddings[:, :-1], [0, 0, 1, 0, 0, 0], value=0)], dim=2)
+        token_embeddings = torch.cat(
+            [
+                F.pad(token_embeddings[:, 1:], [0, 0, 0, 1, 0, 0], value=0),
+                token_embeddings,
+                F.pad(token_embeddings[:, :-1], [0, 0, 1, 0, 0, 0], value=0),
+            ],
+            dim=2,
+        )
         token_embeddings = self.dense(token_embeddings)
 
         segment_embeddings = self.segment_embeddings(segment_ids)
@@ -66,38 +81,58 @@ class MobileBertAttention(nn.Module):
 
         self.softmax = nn.Softmax(dim=-1)
         self.dense = nn.Linear(self.all_head_size, config.inner_hidden_size)
-        self.layernorm = nn.LayerNorm(config.inner_hidden_size) if not config.use_opt else NoNorm(config.inner_hidden_size)
+        self.layernorm = (
+            nn.LayerNorm(config.inner_hidden_size)
+            if not config.use_opt
+            else NoNorm(config.inner_hidden_size)
+        )
         self.hidden_dropout = nn.Dropout(config.hidden_dropout_prob)
 
-    def forward(self, hidden_states, inner_hidden_states, attn_mask, is_calc_cka = False):
+    def forward(self, hidden_states, inner_hidden_states, attn_mask, is_calc_cka=False):
         query = self.query(hidden_states)
         key = self.key(hidden_states)
         value = self.value(hidden_states)
 
-        query = query.view(hidden_states.size(0), -1, self.num_attn_heads, self.attn_head_size).permute(0, 2, 1, 3)
-        key = key.view(hidden_states.size(0), -1, self.num_attn_heads, self.attn_head_size).permute(0, 2, 1, 3)
-        value = value.view(hidden_states.size(0), -1, self.num_attn_heads, self.attn_head_size).permute(0, 2, 1, 3)
+        query = query.view(
+            hidden_states.size(0), -1, self.num_attn_heads, self.attn_head_size
+        ).permute(0, 2, 1, 3)
+        key = key.view(
+            hidden_states.size(0), -1, self.num_attn_heads, self.attn_head_size
+        ).permute(0, 2, 1, 3)
+        value = value.view(
+            hidden_states.size(0), -1, self.num_attn_heads, self.attn_head_size
+        ).permute(0, 2, 1, 3)
 
-        #print("attn_mask.shape={}".format(attn_mask.shape))
-        #print("attn_mask={}".format(attn_mask))
-        #for i in range(attn_mask.size(0)):
+        # print("attn_mask.shape={}".format(attn_mask.shape))
+        # print("attn_mask={}".format(attn_mask))
+        # for i in range(attn_mask.size(0)):
         #    for j in range(attn_mask.size(0)):
         #       print(attn_mask[i][j])
         attn_mask = attn_mask[:, None, None, :]
-        #print("attn_mask.shape={}".format(attn_mask.shape))
-        #print("attn_mask={}".format(attn_mask))
-        attn_score = torch.matmul(query, key.transpose(-1, -2)) / math.sqrt(self.attn_head_size)
+        # print("attn_mask.shape={}".format(attn_mask.shape))
+        # print("attn_mask={}".format(attn_mask))
+        attn_score = torch.matmul(query, key.transpose(-1, -2)) / math.sqrt(
+            self.attn_head_size
+        )
         attn_score += attn_mask * -10000.0
         attn_prob = self.attn_dropout(self.softmax(attn_score))
 
         context = torch.matmul(attn_prob, value)
         # [64, 12, 128, 44]
-        #print(context.size())
-        c = context.permute(1, 0, 2, 3).contiguous().view(self.num_attn_heads, value.size(0), -1)
-        #print(c.size())
-        #print(len(c))
-        context = context.permute(0, 2, 1, 3).contiguous().view(value.size(0), -1, self.all_head_size)
-        #print(context.shape)
+        # print(context.size())
+        c = (
+            context.permute(1, 0, 2, 3)
+            .contiguous()
+            .view(self.num_attn_heads, value.size(0), -1)
+        )
+        # print(c.size())
+        # print(len(c))
+        context = (
+            context.permute(0, 2, 1, 3)
+            .contiguous()
+            .view(value.size(0), -1, self.all_head_size)
+        )
+        # print(context.shape)
         avg_cka = 0
         if is_calc_cka:
             # for now_batch in range(context.shape[0]):
@@ -106,7 +141,9 @@ class MobileBertAttention(nn.Module):
             #                cka_sum[i][j] += cuda_cka.kernel_CKA(context[now_batch,:,i*self.attn_head_size:(i+1)*self.attn_head_size],
             #                                                     context[now_batch,:,j*self.attn_head_size:(j+1)*self.attn_head_size])
             with torch.no_grad():
-                cka_logger = CKA_Minibatch_Grid(self.num_attn_heads, self.num_attn_heads)
+                cka_logger = CKA_Minibatch_Grid(
+                    self.num_attn_heads, self.num_attn_heads
+                )
                 # for data_batch in data_loader:
                 #     feature_list_1 = model_1(data_batch)  # len(feature_list_1) = d1
                 #     feature_list_2 = model_2(data_batch)  # len(feature_list_2) = d2
@@ -114,7 +151,8 @@ class MobileBertAttention(nn.Module):
                 cka_sum = cka_logger.compute()  # [d1, d2]
                 numpy_cka = cka_sum.sum().numpy()
                 avg_cka = (numpy_cka - self.num_attn_heads) / (
-                            self.num_attn_heads * self.num_attn_heads - self.num_attn_heads)
+                    self.num_attn_heads * self.num_attn_heads - self.num_attn_heads
+                )
             # print('cka_sum_MobileBertAttention={}'.format(cka_sum))
         context = self.hidden_dropout(self.dense(context))
         output = self.layernorm(inner_hidden_states + context)
@@ -145,7 +183,11 @@ class TinyMobileBertAttention(nn.Module):
 
         self.softmax = nn.Softmax(dim=-1)
         self.dense = nn.Linear(self.all_head_size, config.inner_hidden_size)
-        self.layernorm = nn.LayerNorm(config.inner_hidden_size) if not config.use_opt else NoNorm(config.inner_hidden_size)
+        self.layernorm = (
+            nn.LayerNorm(config.inner_hidden_size)
+            if not config.use_opt
+            else NoNorm(config.inner_hidden_size)
+        )
         self.hidden_dropout = nn.Dropout(config.hidden_dropout_prob)
 
     def forward(self, hidden_states, attn_mask):
@@ -153,17 +195,29 @@ class TinyMobileBertAttention(nn.Module):
         key = self.key(hidden_states)
         value = self.value(hidden_states)
 
-        query = query.view(hidden_states.size(0), -1, self.num_attn_heads, self.attn_head_size).permute(0, 2, 1, 3)
-        key = key.view(hidden_states.size(0), -1, self.num_attn_heads, self.attn_head_size).permute(0, 2, 1, 3)
-        value = value.view(hidden_states.size(0), -1, self.num_attn_heads, self.attn_head_size).permute(0, 2, 1, 3)
+        query = query.view(
+            hidden_states.size(0), -1, self.num_attn_heads, self.attn_head_size
+        ).permute(0, 2, 1, 3)
+        key = key.view(
+            hidden_states.size(0), -1, self.num_attn_heads, self.attn_head_size
+        ).permute(0, 2, 1, 3)
+        value = value.view(
+            hidden_states.size(0), -1, self.num_attn_heads, self.attn_head_size
+        ).permute(0, 2, 1, 3)
 
         attn_mask = attn_mask[:, None, None, :]
-        attn_score = torch.matmul(query, key.transpose(-1, -2)) / math.sqrt(self.attn_head_size)
+        attn_score = torch.matmul(query, key.transpose(-1, -2)) / math.sqrt(
+            self.attn_head_size
+        )
         attn_score += attn_mask * -10000.0
         attn_prob = self.attn_dropout(self.softmax(attn_score))
 
         context = torch.matmul(attn_prob, value)
-        context = context.permute(0, 2, 1, 3).contiguous().view(value.size(0), -1, self.all_head_size)
+        context = (
+            context.permute(0, 2, 1, 3)
+            .contiguous()
+            .view(value.size(0), -1, self.all_head_size)
+        )
         context = self.hidden_dropout(self.dense(context))
         output = self.layernorm(hidden_states + context)
         return output, attn_score
@@ -176,43 +230,59 @@ class MobileBertFeedForwardNetwork(nn.Module):
         self.max_ffn_hidden_size = config.max_ffn_hidden_size
         self.init_hidden_size = config.init_hidden_size
         self.hidden_size_increment = config.hidden_size_increment
-        self.dense1 = DynamicLinear(config.inner_hidden_size, self.max_ffn_hidden_size)
+        self.dense1 = DynamicLinear(
+            config.inner_hidden_size, self.max_ffn_hidden_size)
         self.activation = models.gelu if not config.use_opt else nn.ReLU()
-        self.dense2 = DynamicLinear(self.max_ffn_hidden_size, config.inner_hidden_size)
-        self.dense1.set_indices([0, config.inner_hidden_size-1], [0, config.init_hidden_size-1])
-        self.dense2.set_indices([0, config.init_hidden_size-1], [0, config.inner_hidden_size-1])
+        self.dense2 = DynamicLinear(
+            self.max_ffn_hidden_size, config.inner_hidden_size)
+        self.dense1.set_indices(
+            [0, config.inner_hidden_size - 1], [0, config.init_hidden_size - 1]
+        )
+        self.dense2.set_indices(
+            [0, config.init_hidden_size - 1], [0, config.inner_hidden_size - 1]
+        )
         self.dropout = nn.Dropout(config.hidden_dropout_prob)
-        self.layernorm = nn.LayerNorm(config.inner_hidden_size) if not config.use_opt else NoNorm(config.inner_hidden_size)
+        self.layernorm = (
+            nn.LayerNorm(config.inner_hidden_size)
+            if not config.use_opt
+            else NoNorm(config.inner_hidden_size)
+        )
 
     def add_indices(self):
         logging.info(
-            "MobileBertFeedForwardNetwork, self.dense1.get_out_dimension()={}, self.max_ffn_hidden_size={}".format(
-                self.dense1.get_out_dimension(), self.max_ffn_hidden_size))
+            'MobileBertFeedForwardNetwork, self.dense1.get_out_dimension()={}, self.max_ffn_hidden_size={}'.format(
+                self.dense1.get_out_dimension(), self.max_ffn_hidden_size
+            )
+        )
         if self.dense1.get_out_dimension() >= self.max_ffn_hidden_size:
             return False
         self.dense1.add_out_indices(self.hidden_size_increment)
         self.dense2.add_in_indices(self.hidden_size_increment)
         return True
 
-    def forward(self, hidden_states, is_calc_pca, idx = None):
-        #output = self.activation(self.dense1(hidden_states))
+    def forward(self, hidden_states, is_calc_pca, idx=None):
+        # output = self.activation(self.dense1(hidden_states))
         output = self.dense1(hidden_states)
-        #logging.info('MobileBertTransformerBlockForSupernet out_size={}'.format(out_size))
+        # logging.info('MobileBertTransformerBlockForSupernet out_size={}'.format(out_size))
         pca_sum = 0
         in_size = self.dense1.get_in_dimension().item()
         out_size = self.dense1.get_out_dimension().item()
         if is_calc_pca:
-            pca_sum = pca_torch(output.view(-1, out_size), (0.99, ))[0]
+            pca_sum = pca_torch(output.view(-1, out_size), (0.99,))[0]
         output = self.activation(output)
         output = self.dropout(self.dense2(output))
         output = self.layernorm(hidden_states + output)
-        #logging.info("MobileBertFeedForwardNetwork, {}-{}-{}".format(idx, min(in_size, out_size), out_size))
+        # logging.info("MobileBertFeedForwardNetwork, {}-{}-{}".format(idx, min(in_size, out_size), out_size))
         return output, pca_sum / min(in_size, out_size)
 
     def flops(self, seq_len):
         flops = 0
-        flops += self.dense1.get_in_dimension() * self.dense1.get_out_dimension() * seq_len
-        flops += self.dense2.get_in_dimension() * self.dense2.get_out_dimension() * seq_len
+        flops += (
+            self.dense1.get_in_dimension() * self.dense1.get_out_dimension() * seq_len
+        )
+        flops += (
+            self.dense2.get_in_dimension() * self.dense2.get_out_dimension() * seq_len
+        )
         return flops
 
 
@@ -223,17 +293,26 @@ class MobileBertTransformerBlock(nn.Module):
         self.dense1 = nn.Linear(config.hidden_size, config.inner_hidden_size)
         self.dense2 = nn.Linear(config.inner_hidden_size, config.hidden_size)
         self.attention = MobileBertAttention(config)
-        self.all_ffn = nn.ModuleList([MobileBertFeedForwardNetwork(config) for _ in range(4)])
-        self.layernorm = nn.LayerNorm(config.hidden_size) if not config.use_opt else NoNorm(config.hidden_size)
+        self.all_ffn = nn.ModuleList(
+            [MobileBertFeedForwardNetwork(config) for _ in range(4)]
+        )
+        self.layernorm = (
+            nn.LayerNorm(config.hidden_size)
+            if not config.use_opt
+            else NoNorm(config.hidden_size)
+        )
 
     def forward(self, hidden_states, attn_mask):
         inner_hidden_states = self.dense1(hidden_states)
-        attn_output, attn_score = self.attention(hidden_states, inner_hidden_states, attn_mask)
+        attn_output, attn_score = self.attention(
+            hidden_states, inner_hidden_states, attn_mask
+        )
         output = attn_output
         for ffn_layer in self.all_ffn:
             output = ffn_layer(output)
         output = self.layernorm(hidden_states + self.dense2(output))
         return output, attn_score
+
 
 class MobileBertTransformerBlockForSupernet(nn.Module):
     def __init__(self, config):
@@ -243,20 +322,26 @@ class MobileBertTransformerBlockForSupernet(nn.Module):
         self.dense2 = nn.Linear(config.inner_hidden_size, config.hidden_size)
         self.attention = MobileBertAttention(config)
         self.ffn = MobileBertFeedForwardNetwork(config)
-        self.layernorm = nn.LayerNorm(config.hidden_size) if not config.use_opt else NoNorm(config.hidden_size)
+        self.layernorm = (
+            nn.LayerNorm(config.hidden_size)
+            if not config.use_opt
+            else NoNorm(config.hidden_size)
+        )
 
     def add_indices(self):
         return self.ffn.add_indices()
 
-    def forward(self, hidden_states, attn_mask, is_calc_pca_cka = False, idx = None):
-        #logging.info('self.dense1.shape={}, hidden_states.shape={}'.format(self.dense1.shape, hidden_states.shape))
+    def forward(self, hidden_states, attn_mask, is_calc_pca_cka=False, idx=None):
+        # logging.info('self.dense1.shape={}, hidden_states.shape={}'.format(self.dense1.shape, hidden_states.shape))
         inner_hidden_states = self.dense1(hidden_states)
-        attn_output, attn_score, cka_sum = self.attention(hidden_states, inner_hidden_states, attn_mask, is_calc_pca_cka)
+        attn_output, attn_score, cka_sum = self.attention(
+            hidden_states, inner_hidden_states, attn_mask, is_calc_pca_cka
+        )
         output = attn_output
-        output, pca_sum  = self.ffn(output, is_calc_pca_cka, idx)
+        output, pca_sum = self.ffn(output, is_calc_pca_cka, idx)
         output = self.layernorm(hidden_states + self.dense2(output))
-        #import logging
-        #logging.info('output.shape={}, attn_score.shape={}'.format(output.shape, attn_score.shape))
+        # import logging
+        # logging.info('output.shape={}, attn_score.shape={}'.format(output.shape, attn_score.shape))
         return output, attn_output, attn_score, cka_sum, pca_sum
 
     def params(self):
@@ -288,12 +373,19 @@ class TinyMobileBertTransformerBlock(nn.Module):
         self.dense1 = nn.Linear(config.hidden_size, config.inner_hidden_size)
         self.dense2 = nn.Linear(config.inner_hidden_size, config.hidden_size)
         self.attention = TinyMobileBertAttention(config)
-        self.all_ffn = nn.ModuleList([MobileBertFeedForwardNetwork(config) for _ in range(2)])
-        self.layernorm = nn.LayerNorm(config.hidden_size) if not config.use_opt else NoNorm(config.hidden_size)
+        self.all_ffn = nn.ModuleList(
+            [MobileBertFeedForwardNetwork(config) for _ in range(2)]
+        )
+        self.layernorm = (
+            nn.LayerNorm(config.hidden_size)
+            if not config.use_opt
+            else NoNorm(config.hidden_size)
+        )
 
     def forward(self, hidden_states, attn_mask):
         inner_hidden_states = self.dense1(hidden_states)
-        attn_output, attn_score = self.attention(inner_hidden_states, attn_mask)
+        attn_output, attn_score = self.attention(
+            inner_hidden_states, attn_mask)
         output = attn_output
         for ffn_layer in self.all_ffn:
             output = ffn_layer(output)
@@ -308,12 +400,22 @@ class MobileBertSingle(nn.Module):
         self.use_lm = use_lm
         self.embeddings = MobileBertEmbedding(config)
         if config.is_tiny:
-            self.encoder = nn.ModuleList([TinyMobileBertTransformerBlock(config) for _ in range(config.num_layers)])
+            self.encoder = nn.ModuleList(
+                [
+                    TinyMobileBertTransformerBlock(config)
+                    for _ in range(config.num_layers)
+                ]
+            )
         else:
-            self.encoder = nn.ModuleList([MobileBertTransformerBlock(config) for _ in range(config.num_layers)])
+            self.encoder = nn.ModuleList(
+                [MobileBertTransformerBlock(config)
+                 for _ in range(config.num_layers)]
+            )
 
         if self.use_lm:
-            self.lm_head = models.BertMaskedLMHead(config, self.embeddings.token_embeddings.weight)
+            self.lm_head = models.BertMaskedLMHead(
+                config, self.embeddings.token_embeddings.weight
+            )
         self._init_weights()
 
     def forward(self, token_ids, segment_ids, position_ids, attn_mask):
@@ -349,9 +451,17 @@ class MobileBert(nn.Module):
         self.return_hid = return_hid
         self.embeddings = MobileBertEmbedding(config)
         if config.is_tiny:
-            self.encoder = nn.ModuleList([TinyMobileBertTransformerBlock(config) for _ in range(config.num_layers)])
+            self.encoder = nn.ModuleList(
+                [
+                    TinyMobileBertTransformerBlock(config)
+                    for _ in range(config.num_layers)
+                ]
+            )
         else:
-            self.encoder = nn.ModuleList([MobileBertTransformerBlock(config) for _ in range(config.num_layers)])
+            self.encoder = nn.ModuleList(
+                [MobileBertTransformerBlock(config)
+                 for _ in range(config.num_layers)]
+            )
 
         if task in datasets.glue_tasks:
             self.num_classes = datasets.glue_num_classes[task]
@@ -391,7 +501,12 @@ class MobileBert(nn.Module):
             output = self.classifier(output)
             start_logits, end_logits = output.split(1, dim=-1)
             if self.return_hid:
-                return start_logits.squeeze(-1), end_logits.squeeze(-1), all_attn_outputs, all_ffn_outputs
+                return (
+                    start_logits.squeeze(-1),
+                    end_logits.squeeze(-1),
+                    all_attn_outputs,
+                    all_ffn_outputs,
+                )
             return start_logits.squeeze(-1), end_logits.squeeze(-1)
         elif self.task in datasets.multi_choice_tasks:
             output = self.cls_pooler(output[:, 0])

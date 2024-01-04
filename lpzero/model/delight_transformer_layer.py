@@ -1,90 +1,112 @@
 # ============================================
-__author__ = "Sachin Mehta"
-__maintainer__ = "Sachin Mehta"
+__author__ = 'Sachin Mehta'
+__maintainer__ = 'Sachin Mehta'
 # ============================================
 
 from typing import Dict, List, Optional
+
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
-from torch import Tensor
+from fairseq.delight_modules import DEFAULT_MIN_DEXTRA_LAYERS, DEFAULT_WIDTH_MULTIPLIER
 from fairseq.delight_modules.activation_layers import get_activation_layer
-from fairseq.delight_modules.normalization_layers import get_norm_layer
-from fairseq.delight_modules.nn_functions import get_weight_layer
-from fairseq.delight_modules import DEFAULT_WIDTH_MULTIPLIER, DEFAULT_MIN_DEXTRA_LAYERS
 from fairseq.delight_modules.dextra_unit import DExTraUnit
+from fairseq.delight_modules.nn_functions import get_weight_layer
+from fairseq.delight_modules.normalization_layers import get_norm_layer
 from fairseq.modules import SingleHeadAttention
+from torch import Tensor
 
 
 class DeLighTTransformerEncoderLayer(nn.Module):
-    """DeLight Encoder layer
-    """
+    """DeLight Encoder layer"""
 
-    def __init__(self, args, embed_dim, width_multiplier=DEFAULT_WIDTH_MULTIPLIER, dextra_depth=DEFAULT_MIN_DEXTRA_LAYERS,
-                 dextra_proj=2):
+    def __init__(
+        self,
+        args,
+        embed_dim,
+        width_multiplier=DEFAULT_WIDTH_MULTIPLIER,
+        dextra_depth=DEFAULT_MIN_DEXTRA_LAYERS,
+        dextra_proj=2,
+    ):
         super().__init__()
         self.embed_dim = embed_dim
         assert embed_dim % dextra_proj == 0
 
         self.proj_dim = embed_dim // dextra_proj
-        self.dextra_layer = DExTraUnit(in_features=self.embed_dim,
-                                       in_proj_features=self.proj_dim,
-                                       out_features=self.proj_dim,
-                                       width_multiplier=width_multiplier,
-                                       dextra_depth=dextra_depth,
-                                       dextra_dropout=args.delight_dropout,
-                                       max_glt_groups=args.delight_enc_max_groups,
-                                       act_type=args.act_type,
-                                       use_bias=True,
-                                       norm_type=args.norm_type,
-                                       glt_shuffle=args.glt_shuffle,
-                                       is_iclr_version=args.define_iclr
-                                       )
+        self.dextra_layer = DExTraUnit(
+            in_features=self.embed_dim,
+            in_proj_features=self.proj_dim,
+            out_features=self.proj_dim,
+            width_multiplier=width_multiplier,
+            dextra_depth=dextra_depth,
+            dextra_dropout=args.delight_dropout,
+            max_glt_groups=args.delight_enc_max_groups,
+            act_type=args.act_type,
+            use_bias=True,
+            norm_type=args.norm_type,
+            glt_shuffle=args.glt_shuffle,
+            is_iclr_version=args.define_iclr,
+        )
 
-        self.self_attn = SingleHeadAttention(q_in_dim=self.proj_dim,
-                                             kv_in_dim=self.proj_dim,
-                                             proj_dim=self.proj_dim,
-                                             out_dim=self.embed_dim,
-                                             dropout=args.attention_dropout,
-                                             bias=True,
-                                             self_attention=True,
-                                             encoder_decoder_attention=False)
+        self.self_attn = SingleHeadAttention(
+            q_in_dim=self.proj_dim,
+            kv_in_dim=self.proj_dim,
+            proj_dim=self.proj_dim,
+            out_dim=self.embed_dim,
+            dropout=args.attention_dropout,
+            bias=True,
+            self_attention=True,
+            encoder_decoder_attention=False,
+        )
 
-        self.self_attn_layer_norm = get_norm_layer(name=args.norm_type, out_features=self.embed_dim)
+        self.self_attn_layer_norm = get_norm_layer(
+            name=args.norm_type, out_features=self.embed_dim
+        )
         self.dropout = args.dropout
         self.norm_fn = args.norm_type
         self.act_type = args.act_type
         self.activation_fn = get_activation_layer(name=args.act_type)
-        self.activation_dropout = getattr(args, "activation_dropout", 0)
+        self.activation_dropout = getattr(args, 'activation_dropout', 0)
         if self.activation_dropout == 0:
             # for backwards compatibility with models that use args.relu_dropout
-            self.activation_dropout = getattr(args, "relu_dropout", 0)
+            self.activation_dropout = getattr(args, 'relu_dropout', 0)
         self.normalize_before = args.encoder_normalize_before
 
         # Light-weight FFN
         self.ffn_dropout = args.ffn_dropout
         ffn_red_factor = args.delight_enc_ffn_red
-        assert self.embed_dim % ffn_red_factor == 0, '{}/{} should be a perfect divisor'.format(self.embed_dim,
-                                                                                                ffn_red_factor)
+        assert (
+            self.embed_dim % ffn_red_factor == 0
+        ), '{}/{} should be a perfect divisor'.format(self.embed_dim, ffn_red_factor)
         light_ffn_dim = self.embed_dim // ffn_red_factor
-        self.fc1 = get_weight_layer(name='linear',
-                                    in_features=self.embed_dim,
-                                    out_features=light_ffn_dim,
-                                    use_bias=True)
-        self.fc2 = get_weight_layer(name='linear',
-                                    in_features=light_ffn_dim,
-                                    out_features=self.embed_dim,
-                                    use_bias=True)
+        self.fc1 = get_weight_layer(
+            name='linear',
+            in_features=self.embed_dim,
+            out_features=light_ffn_dim,
+            use_bias=True,
+        )
+        self.fc2 = get_weight_layer(
+            name='linear',
+            in_features=light_ffn_dim,
+            out_features=self.embed_dim,
+            use_bias=True,
+        )
 
-        self.final_layer_norm = get_norm_layer(name=args.norm_type, out_features=self.embed_dim)
+        self.final_layer_norm = get_norm_layer(
+            name=args.norm_type, out_features=self.embed_dim
+        )
 
     def __repr__(self):
-        s = '{name}(in_features={embed_dim}, out_features={embed_dim}, dropout={dropout},' \
-            'activation_dropout={activation_dropout}, ffn_dropout={ffn_dropout}, ' \
+        s = (
+            '{name}(in_features={embed_dim}, out_features={embed_dim}, dropout={dropout},'
+            'activation_dropout={activation_dropout}, ffn_dropout={ffn_dropout}, '
             'activation_fn={act_type}, norm_fn={norm_fn})'
+        )
         s += '\n \t Dextra Layer: \n \t \t {}'.format(self.dextra_layer)
         s += '\n \t Self Attention: \n \t \t {}'.format(self.self_attn)
-        s += '\n \t     Light-weight FFN: \n \t     |---- {} \n \t     |---- {}'.format(self.fc1, self.fc2)
+        s += '\n \t     Light-weight FFN: \n \t     |---- {} \n \t     |---- {}'.format(
+            self.fc1, self.fc2
+        )
         return s.format(name=self.__class__.__name__, **self.__dict__)
 
     def upgrade_state_dict_named(self, state_dict, name):
@@ -93,12 +115,12 @@ class DeLighTTransformerEncoderLayer(nn.Module):
         `...self_attn_layer_norm.weight` and `...layer_norms.1.weight` to
         `...final_layer_norm.weight`
         """
-        layer_norm_map = {"0": "self_attn_layer_norm", "1": "final_layer_norm"}
+        layer_norm_map = {'0': 'self_attn_layer_norm', '1': 'final_layer_norm'}
         for old, new in layer_norm_map.items():
-            for m in ("weight", "bias"):
-                k = "{}.layer_norms.{}.{}".format(name, old, m)
+            for m in ('weight', 'bias'):
+                k = '{}.layer_norms.{}.{}'.format(name, old, m)
                 if k in state_dict:
-                    state_dict["{}.{}.{}".format(name, new, m)] = state_dict[k]
+                    state_dict['{}.{}.{}'.format(name, new, m)] = state_dict[k]
                     del state_dict[k]
 
     def forward(self, x, encoder_padding_mask, attn_mask: Optional[Tensor] = None):
@@ -129,7 +151,7 @@ class DeLighTTransformerEncoderLayer(nn.Module):
             query=x,
             key_value=None,
             key_padding_mask=encoder_padding_mask,
-            attn_mask=attn_mask
+            attn_mask=attn_mask,
         )
         x = F.dropout(x, p=self.dropout, training=self.training)
         x = residual + x
@@ -142,7 +164,8 @@ class DeLighTTransformerEncoderLayer(nn.Module):
         if self.normalize_before:
             x = self.final_layer_norm(x)
         x = self.activation_fn(self.fc1(x))
-        x = F.dropout(x, p=float(self.activation_dropout), training=self.training)
+        x = F.dropout(x, p=float(self.activation_dropout),
+                      training=self.training)
         x = self.fc2(x)
         x = F.dropout(x, p=self.ffn_dropout, training=self.training)
         x = residual + x
@@ -157,12 +180,13 @@ class DeLighTTransformerEncoderLayer(nn.Module):
 
         # Layer Norms
         # MACS are zero for LayerNorm because they can be fused
-        n_params += sum([p.numel() for p in self.self_attn_layer_norm.parameters()])
+        n_params += sum([p.numel()
+                        for p in self.self_attn_layer_norm.parameters()])
 
         # Dextra layer
         dextra_layer = self.dextra_layer.compute_macs_params()
         n_params += dextra_layer['params']
-        macs += (dextra_layer['macs'] * S)
+        macs += dextra_layer['macs'] * S
 
         # Attn
         self_attn_layer = self.self_attn.compute_macs_params(T=S, S=S)
@@ -173,21 +197,22 @@ class DeLighTTransformerEncoderLayer(nn.Module):
         # FFN
         fc1_layer = self.fc1.compute_macs_params()
         # scale MACS by S because S tokens can be processed in parallel
-        macs += (fc1_layer['macs'] * S)
+        macs += fc1_layer['macs'] * S
         n_params += fc1_layer['params']
 
         fc2_layer = self.fc2.compute_macs_params()
         # scale MACS by S because S tokens can be processed in parallel
-        macs += (fc2_layer['macs'] * S)
+        macs += fc2_layer['macs'] * S
         n_params += fc2_layer['params']
 
-        n_params += sum([p.numel() for p in self.final_layer_norm.parameters()])
+        n_params += sum([p.numel()
+                        for p in self.final_layer_norm.parameters()])
 
         return {
             'name': self.__class__.__name__,
             'macs': macs,
             'params': n_params,
-            'macs_attn': macs_attn
+            'macs_attn': macs_attn,
         }
 
 

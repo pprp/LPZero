@@ -1,4 +1,9 @@
-from .glue import simple_accuracy, acc_and_f1, pearson_and_spearman, compute_glue_metrics
+from .glue import (
+    acc_and_f1,
+    compute_glue_metrics,
+    pearson_and_spearman,
+    simple_accuracy,
+)
 from .squad import compute_squad_metrics
 
 all_glue_select_metrics = {

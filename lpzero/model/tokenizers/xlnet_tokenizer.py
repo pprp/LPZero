@@ -1,14 +1,23 @@
-import sentencepiece as spm
 import unicodedata
+
 import datasets
+import sentencepiece as spm
 import tokenizers
 
-SPIECE_UNDERLINE = u'▁'
+SPIECE_UNDERLINE = '▁'
 
 
 class XlnetBasicTokenizer(tokenizers.BaseTokenizer):
-    def __init__(self, lowercase, vocab_path, unk_token='<unk>', sep_token='<sep>', pad_token='<pad>',
-                 cls_token='<cls>', mask_token='<mask>'):
+    def __init__(
+        self,
+        lowercase,
+        vocab_path,
+        unk_token='<unk>',
+        sep_token='<sep>',
+        pad_token='<pad>',
+        cls_token='<cls>',
+        mask_token='<mask>',
+    ):
         super(XlnetBasicTokenizer, self).__init__(lowercase)
 
         self.lowercase = lowercase
@@ -20,7 +29,13 @@ class XlnetBasicTokenizer(tokenizers.BaseTokenizer):
         self.pad_token = pad_token
         self.cls_token = cls_token
         self.mask_token = mask_token
-        self.special_tokens = {self.unk_token, self.sep_token, self.pad_token, self.cls_token, self.mask_token}
+        self.special_tokens = {
+            self.unk_token,
+            self.sep_token,
+            self.pad_token,
+            self.cls_token,
+            self.mask_token,
+        }
 
         self.unk_token_id = self.sp_model.PieceToId(self.unk_token)
         self.sep_token_id = self.sp_model.PieceToId(self.sep_token)
@@ -35,7 +50,7 @@ class XlnetBasicTokenizer(tokenizers.BaseTokenizer):
 
     def _prepocess_text(self, text):
         output = ' '.join(text.strip().split())
-        output = output.replace("``", '"').replace("''", '"')
+        output = output.replace('``', '"').replace("''", '"')
         output = unicodedata.normalize('NFKD', output)
         output = ''.join([c for c in output if not unicodedata.combining(c)])
         if self.lowercase:
@@ -47,8 +62,13 @@ class XlnetBasicTokenizer(tokenizers.BaseTokenizer):
         new_pieces = []
         for piece in pieces:
             if len(piece) > 1 and piece[-1] == str(',') and piece[-2].isdigit():
-                cur_pieces = self.sp_model.EncodeAsPieces(piece[:-1].replace(SPIECE_UNDERLINE, ''))
-                if piece[0] != SPIECE_UNDERLINE and cur_pieces[0][0] == SPIECE_UNDERLINE:
+                cur_pieces = self.sp_model.EncodeAsPieces(
+                    piece[:-1].replace(SPIECE_UNDERLINE, '')
+                )
+                if (
+                    piece[0] != SPIECE_UNDERLINE
+                    and cur_pieces[0][0] == SPIECE_UNDERLINE
+                ):
                     if len(cur_pieces[0]) == 1:
                         cur_pieces = cur_pieces[1:]
                     else:
@@ -124,5 +144,7 @@ class XlnetTokenizer(XlnetBasicTokenizer):
             segment_ids = [pad_segment_id] * dif + segment_ids
             attn_mask = [1] * dif + attn_mask
 
-        position_ids = [i for i in range(self.max_seq_len)]  # Will not be used in xlnet model
+        position_ids = [
+            i for i in range(self.max_seq_len)
+        ]  # Will not be used in xlnet model
         return token_ids, segment_ids, position_ids, attn_mask

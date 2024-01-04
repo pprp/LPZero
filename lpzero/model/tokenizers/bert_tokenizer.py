@@ -1,6 +1,7 @@
 import unicodedata
-import tokenizers
 from collections import OrderedDict
+
+import tokenizers
 
 
 def _is_whitespace(char):
@@ -42,20 +43,36 @@ def load_vocab(vocab_path):
 
 
 class BertBasicTokenizer(tokenizers.BaseTokenizer):
-    def __init__(self, lowercase, vocab_path, unk_token='[UNK]', sep_token='[SEP]', pad_token='[PAD]',
-                 cls_token='[CLS]', mask_token='[MASK]'):
+    def __init__(
+        self,
+        lowercase,
+        vocab_path,
+        unk_token='[UNK]',
+        sep_token='[SEP]',
+        pad_token='[PAD]',
+        cls_token='[CLS]',
+        mask_token='[MASK]',
+    ):
         super(BertBasicTokenizer, self).__init__(lowercase)
 
         self.lowercase = lowercase
         self.vocab_map = load_vocab(vocab_path)
-        self.id_to_token_map = OrderedDict([(id, token) for token, id in self.vocab_map.items()])
+        self.id_to_token_map = OrderedDict(
+            [(id, token) for token, id in self.vocab_map.items()]
+        )
 
         self.unk_token = unk_token
         self.sep_token = sep_token
         self.pad_token = pad_token
         self.cls_token = cls_token
         self.mask_token = mask_token
-        self.special_tokens = {self.unk_token, self.sep_token, self.pad_token, self.cls_token, self.mask_token}
+        self.special_tokens = {
+            self.unk_token,
+            self.sep_token,
+            self.pad_token,
+            self.cls_token,
+            self.mask_token,
+        }
 
         self.unk_token_id = self.vocab_map[self.unk_token]
         self.sep_token_id = self.vocab_map[self.sep_token]
@@ -86,7 +103,7 @@ class BertBasicTokenizer(tokenizers.BaseTokenizer):
         output = []
         for char in text:
             cp = ord(char)
-            if cp == 0 or cp == 0xfffd or _is_control(char):
+            if cp == 0 or cp == 0xFFFD or _is_control(char):
                 continue
             if _is_whitespace(char):
                 output.append(' ')
@@ -157,7 +174,8 @@ class BertBasicTokenizer(tokenizers.BaseTokenizer):
     def _tokens_to_ids(self, tokens):
         ids = []
         for token in tokens:
-            token_id = self.vocab_map.get(token, self.vocab_map.get(self.unk_token))
+            token_id = self.vocab_map.get(
+                token, self.vocab_map.get(self.unk_token))
             ids.append(token_id)
         return ids
 

@@ -2,12 +2,14 @@
 This file is from https://github.com/mlpen/Nystromformer
 """
 
+import json
+import math
+import pdb
+
 import torch
 import torch.nn as nn
-import math
-import json
 from torch.utils.checkpoint import checkpoint
-import pdb
+
 
 class SoftmaxAttention(nn.Module):
     def __init__(self, config):
@@ -20,11 +22,12 @@ class SoftmaxAttention(nn.Module):
         dot = dot / math.sqrt(self.head_dim)
         dot = dot - 1e6 * (1 - mask[:, None, None, :])
 
-        attn = nn.functional.softmax(dot, dim = -1)
+        attn = nn.functional.softmax(dot, dim=-1)
         attn = self.drop_attn(attn)
 
         X = torch.matmul(attn, V)
         return X
+
 
 class NoneAttention(nn.Module):
     def __init__(self, config):
@@ -52,50 +55,58 @@ class Attention(nn.Module):
 
         self.dconv_fc = None
 
-        if self.attn_type == "softmax":
+        if self.attn_type == 'softmax':
             self.attn = SoftmaxAttention(config)
-        elif self.attn_type == "none":
+        elif self.attn_type == 'none':
             self.attn = NoneAttention(config)
-        elif self.attn_type.startswith("linformer"):
+        elif self.attn_type.startswith('linformer'):
             from attention_linformer import LinformerAttention
+
             self.attn = LinformerAttention(config)
 
-        elif self.attn_type.startswith("reformer"):
+        elif self.attn_type.startswith('reformer'):
             from attention_reformer import LSHAttention
+
             self.attn = LSHAttention(config, self.W_q, self.W_k, self.W_v)
-        elif self.attn_type.startswith("nystrom"):
+        elif self.attn_type.startswith('nystrom'):
             from attention_nystrom import NystromAttention
+
             self.attn = NystromAttention(config)
-        elif self.attn_type.startswith("performer"):
+        elif self.attn_type.startswith('performer'):
             from attention_performer import PerformerAttention
+
             self.attn = PerformerAttention(config)
-        elif self.attn_type.startswith("linear"):
+        elif self.attn_type.startswith('linear'):
             from attention_linear import LinearAttention
+
             self.attn = LinearAttention(config)
 
         self.ff = nn.Linear(self.num_head * self.head_dim, self.dim)
 
     def forward(self, X, mask):
-
-        if self.attn_type.startswith("longformer") or self.attn_type.startswith("reformer"):
-            with torch.cuda.amp.autocast(enabled = False):
+        if self.attn_type.startswith('longformer') or self.attn_type.startswith(
+            'reformer'
+        ):
+            with torch.cuda.amp.autocast(enabled=False):
                 attn_out = self.attn(X.float(), mask.float())
         else:
             Q = self.split_heads(self.W_q(X))
             K = self.split_heads(self.W_k(X))
             V = self.split_heads(self.W_v(X))
 
-            with torch.cuda.amp.autocast(enabled = False):
+            with torch.cuda.amp.autocast(enabled=False):
                 if self.grad_checkpointing:
-                    attn_out = checkpoint(self.attn, Q.float(), K.float(), V.float(), mask.float())
+                    attn_out = checkpoint(
+                        self.attn, Q.float(), K.float(), V.float(), mask.float()
+                    )
                 else:
-                    attn_out = self.attn(Q.float(), K.float(), V.float(), mask.float())
+                    attn_out = self.attn(
+                        Q.float(), K.float(), V.float(), mask.float())
             attn_out = self.combine_heads(attn_out)
 
         out = self.ff(attn_out)
 
         return out
-
 
     def combine_heads(self, X):
         X = X.transpose(1, 2)

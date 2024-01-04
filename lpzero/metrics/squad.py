@@ -1,12 +1,14 @@
-import math
 import collections
-import string
+import math
 import re
+import string
+
 import models
 
 
 def normalize_answer(s):
-    '''Lower text and remove punctuation, articles and extra whitespace.'''
+    """Lower text and remove punctuation, articles and extra whitespace."""
+
     def remove_articles(text):
         regex = re.compile(r'\b(a|an|the)\b', re.UNICODE)
         return re.sub(regex, ' ', text)
@@ -20,6 +22,7 @@ def normalize_answer(s):
 
     def lower(text):
         return text.lower()
+
     return white_space_fix(remove_articles(remove_punc(lower(s))))
 
 
@@ -50,15 +53,19 @@ def compute_f1(a_gold, a_pred):
 
 
 def get_raw_scores(examples, preds):
-    '''
+    """
     Computes the exact and f1 scores from the examples and the model predictions
-    '''
+    """
     exact_scores = {}
     f1_scores = {}
 
     for example in examples:
         qa_id = example.qa_id
-        gold_answers = [answer['text'] for answer in example.val_answer if normalize_answer(answer['text'])]
+        gold_answers = [
+            answer['text']
+            for answer in example.val_answer
+            if normalize_answer(answer['text'])
+        ]
 
         if not gold_answers:
             # For unanswerable questions, only correct answer is empty string
@@ -69,7 +76,8 @@ def get_raw_scores(examples, preds):
             continue
 
         prediction = preds[qa_id]
-        exact_scores[qa_id] = max(compute_exact(a, prediction) for a in gold_answers)
+        exact_scores[qa_id] = max(compute_exact(a, prediction)
+                                  for a in gold_answers)
         f1_scores[qa_id] = max(compute_f1(a, prediction) for a in gold_answers)
 
     return exact_scores, f1_scores
@@ -91,22 +99,26 @@ def make_eval_dict(exact_scores, f1_scores, qid_list=None):
         total = len(exact_scores)
         exact = 100.0 * sum(exact_scores.values()) / total
         f1 = 100.0 * sum(f1_scores.values()) / total
-        return collections.OrderedDict([
-            ('exact', exact),
-            ('f1', f1),
-            ('exact_and_f1', (exact + f1) / 2),
-            ('total', total),
-        ])
+        return collections.OrderedDict(
+            [
+                ('exact', exact),
+                ('f1', f1),
+                ('exact_and_f1', (exact + f1) / 2),
+                ('total', total),
+            ]
+        )
     else:
         total = len(qid_list)
         exact = 100.0 * sum(exact_scores[k] for k in qid_list) / total
         f1 = 100.0 * sum(f1_scores[k] for k in qid_list) / total
-        return collections.OrderedDict([
-            ('exact', exact),
-            ('f1', f1),
-            ('exact_and_f1', (exact + f1) / 2),
-            ('total', total),
-        ])
+        return collections.OrderedDict(
+            [
+                ('exact', exact),
+                ('f1', f1),
+                ('exact_and_f1', (exact + f1) / 2),
+                ('total', total),
+            ]
+        )
 
 
 def merge_eval(main_eval, new_eval, prefix):
@@ -138,8 +150,11 @@ def find_best_thresh(preds, scores, na_probs, qid_to_has_ans):
 
 
 def find_all_best_thresh(main_eval, preds, exact_raw, f1_raw, na_probs, qid_to_has_ans):
-    best_exact, exact_thresh = find_best_thresh(preds, exact_raw, na_probs, qid_to_has_ans)
-    best_f1, f1_thresh = find_best_thresh(preds, f1_raw, na_probs, qid_to_has_ans)
+    best_exact, exact_thresh = find_best_thresh(
+        preds, exact_raw, na_probs, qid_to_has_ans
+    )
+    best_f1, f1_thresh = find_best_thresh(
+        preds, f1_raw, na_probs, qid_to_has_ans)
 
     main_eval['best_exact'] = best_exact
     main_eval['best_exact_thresh'] = exact_thresh
@@ -147,37 +162,55 @@ def find_all_best_thresh(main_eval, preds, exact_raw, f1_raw, na_probs, qid_to_h
     main_eval['best_f1_thresh'] = f1_thresh
 
 
-def squad_evaluate(examples, preds, no_answer_probs=None, no_answer_probability_threshold=1.0):
-    qa_id_to_has_answer = {example.qa_id: bool(example.val_answer) for example in examples}
-    has_answer_qids = [qa_id for qa_id, has_answer in qa_id_to_has_answer.items() if has_answer]
-    no_answer_qids = [qa_id for qa_id, has_answer in qa_id_to_has_answer.items() if not has_answer]
+def squad_evaluate(
+    examples, preds, no_answer_probs=None, no_answer_probability_threshold=1.0
+):
+    qa_id_to_has_answer = {
+        example.qa_id: bool(example.val_answer) for example in examples
+    }
+    has_answer_qids = [
+        qa_id for qa_id, has_answer in qa_id_to_has_answer.items() if has_answer
+    ]
+    no_answer_qids = [
+        qa_id for qa_id, has_answer in qa_id_to_has_answer.items() if not has_answer
+    ]
 
     if no_answer_probs is None:
         no_answer_probs = {k: 0.0 for k in preds}
 
     exact, f1 = get_raw_scores(examples, preds)
 
-    exact_threshold = apply_no_ans_threshold(exact, no_answer_probs, qa_id_to_has_answer, no_answer_probability_threshold)
-    f1_threshold = apply_no_ans_threshold(f1, no_answer_probs, qa_id_to_has_answer, no_answer_probability_threshold)
+    exact_threshold = apply_no_ans_threshold(
+        exact, no_answer_probs, qa_id_to_has_answer, no_answer_probability_threshold
+    )
+    f1_threshold = apply_no_ans_threshold(
+        f1, no_answer_probs, qa_id_to_has_answer, no_answer_probability_threshold
+    )
 
     evaluation = make_eval_dict(exact_threshold, f1_threshold)
 
     if has_answer_qids:
-        has_ans_eval = make_eval_dict(exact_threshold, f1_threshold, qid_list=has_answer_qids)
+        has_ans_eval = make_eval_dict(
+            exact_threshold, f1_threshold, qid_list=has_answer_qids
+        )
         merge_eval(evaluation, has_ans_eval, 'HasAns')
 
     if no_answer_qids:
-        no_ans_eval = make_eval_dict(exact_threshold, f1_threshold, qid_list=no_answer_qids)
+        no_ans_eval = make_eval_dict(
+            exact_threshold, f1_threshold, qid_list=no_answer_qids
+        )
         merge_eval(evaluation, no_ans_eval, 'NoAns')
 
     if no_answer_probs:
-        find_all_best_thresh(evaluation, preds, exact, f1, no_answer_probs, qa_id_to_has_answer)
+        find_all_best_thresh(
+            evaluation, preds, exact, f1, no_answer_probs, qa_id_to_has_answer
+        )
 
     return evaluation
 
 
 def get_final_text(pred_text, orig_text, tokenizer):
-    '''Project the tokenized prediction back to the original text.'''
+    """Project the tokenized prediction back to the original text."""
 
     # When we created the data, we kept track of the alignment between original
     # (whitespace tokenized) tokens and our WordPiece tokenized tokens. So
@@ -207,7 +240,7 @@ def get_final_text(pred_text, orig_text, tokenizer):
     def _strip_spaces(text):
         ns_chars = []
         ns_to_s_map = collections.OrderedDict()
-        for (i, c) in enumerate(text):
+        for i, c in enumerate(text):
             if c == ' ':
                 continue
             ns_to_s_map[len(ns_chars)] = i
@@ -236,7 +269,7 @@ def get_final_text(pred_text, orig_text, tokenizer):
     # We then project the characters in `pred_text` back to `orig_text` using
     # the character-to-character alignment.
     tok_s_to_ns_map = {}
-    for (i, tok_index) in tok_ns_to_s_map.items():
+    for i, tok_index in tok_ns_to_s_map.items():
         tok_s_to_ns_map[tok_index] = i
 
     orig_start_position = None
@@ -257,12 +290,13 @@ def get_final_text(pred_text, orig_text, tokenizer):
     if orig_end_position is None:
         return orig_text
 
-    output_text = orig_text[orig_start_position:(orig_end_position + 1)]
+    output_text = orig_text[orig_start_position: (orig_end_position + 1)]
     return output_text
 
 
 def get_topk_indices(logits, n_best_size):
-    index_and_score = sorted(enumerate(logits), key=lambda x: x[1], reverse=True)
+    index_and_score = sorted(
+        enumerate(logits), key=lambda x: x[1], reverse=True)
 
     topk_indices = []
     for i in range(len(index_and_score)):
@@ -273,7 +307,7 @@ def get_topk_indices(logits, n_best_size):
 
 
 def _compute_softmax(scores):
-    '''Compute softmax probability over raw logits.'''
+    """Compute softmax probability over raw logits."""
     if not scores:
         return []
 
@@ -295,11 +329,23 @@ def _compute_softmax(scores):
     return probs
 
 
-def create_squad_answer_texts(task, tokenizer, all_examples, all_encoded_inputs, all_results, n_best_size,
-                              max_answer_len, null_score_diff_threshold):
+def create_squad_answer_texts(
+    task,
+    tokenizer,
+    all_examples,
+    all_encoded_inputs,
+    all_results,
+    n_best_size,
+    max_answer_len,
+    null_score_diff_threshold,
+):
     _PrelimPrediction = collections.namedtuple(
-        'PrelimPrediction', ['feature_index', 'start_index', 'end_index', 'start_logit', 'end_logit'])
-    _NbestPrediction = collections.namedtuple('NbestPrediction', ['text', 'start_logit', 'end_logit'])
+        'PrelimPrediction',
+        ['feature_index', 'start_index', 'end_index', 'start_logit', 'end_logit'],
+    )
+    _NbestPrediction = collections.namedtuple(
+        'NbestPrediction', ['text', 'start_logit', 'end_logit']
+    )
 
     example_index_to_features = collections.defaultdict(list)
     for feature in all_encoded_inputs:
@@ -309,7 +355,7 @@ def create_squad_answer_texts(task, tokenizer, all_examples, all_encoded_inputs,
         unique_id_to_result[result.unique_id] = result
 
     predicted_answer_texts = collections.OrderedDict()
-    for (example_index, example) in enumerate(all_examples):
+    for example_index, example in enumerate(all_examples):
         features = example_index_to_features[example_index]
         prelim_predictions = []
         # keep track of the minimum score of null start+end of position 0
@@ -318,14 +364,15 @@ def create_squad_answer_texts(task, tokenizer, all_examples, all_encoded_inputs,
         null_start_logit = 0  # the start logit at the slice with min null score
         null_end_logit = 0  # the end logit at the slice with min null score
 
-        for (feature_index, feature) in enumerate(features):
+        for feature_index, feature in enumerate(features):
             result = unique_id_to_result[feature.unique_id]
             start_indexes = get_topk_indices(result.start_logits, n_best_size)
             end_indexes = get_topk_indices(result.end_logits, n_best_size)
 
             # if we could have irrelevant answers, get the min score of irrelevant
             if task == 'squad2.0':
-                feature_null_score = result.start_logits[0] + result.end_logits[0]
+                feature_null_score = result.start_logits[0] + \
+                    result.end_logits[0]
                 if feature_null_score < score_null:
                     score_null = feature_null_score
                     min_null_feature_index = feature_index
@@ -359,7 +406,9 @@ def create_squad_answer_texts(task, tokenizer, all_examples, all_encoded_inputs,
                             start_index=start_index,
                             end_index=end_index,
                             start_logit=result.start_logits[start_index],
-                            end_logit=result.end_logits[end_index]))
+                            end_logit=result.end_logits[end_index],
+                        )
+                    )
 
         if task == 'squad2.0':
             prelim_predictions.append(
@@ -368,8 +417,14 @@ def create_squad_answer_texts(task, tokenizer, all_examples, all_encoded_inputs,
                     start_index=0,
                     end_index=0,
                     start_logit=null_start_logit,
-                    end_logit=null_end_logit))
-        prelim_predictions = sorted(prelim_predictions, key=lambda x: (x.start_logit + x.end_logit), reverse=True)
+                    end_logit=null_end_logit,
+                )
+            )
+        prelim_predictions = sorted(
+            prelim_predictions,
+            key=lambda x: (x.start_logit + x.end_logit),
+            reverse=True,
+        )
 
         seen_predictions = {}
         nbest = []
@@ -378,10 +433,13 @@ def create_squad_answer_texts(task, tokenizer, all_examples, all_encoded_inputs,
                 break
             feature = features[pred.feature_index]
             if pred.start_index > 0:  # this is a non-null prediction
-                tok_tokens = feature.tokens[pred.start_index:(pred.end_index + 1)]
+                tok_tokens = feature.tokens[pred.start_index: (
+                    pred.end_index + 1)]
                 orig_doc_start = feature.context_subtok_to_tok_idx[pred.start_index]
                 orig_doc_end = feature.context_subtok_to_tok_idx[pred.end_index]
-                orig_tokens = example.context_tokens[orig_doc_start:(orig_doc_end + 1)]
+                orig_tokens = example.context_tokens[
+                    orig_doc_start: (orig_doc_end + 1)
+                ]
                 tok_text = ' '.join(tok_tokens)
 
                 # De-tokenize WordPieces that have been split off.
@@ -401,22 +459,36 @@ def create_squad_answer_texts(task, tokenizer, all_examples, all_encoded_inputs,
             else:
                 final_text = ''
                 seen_predictions[final_text] = True
-            nbest.append(_NbestPrediction(text=final_text, start_logit=pred.start_logit, end_logit=pred.end_logit))
+            nbest.append(
+                _NbestPrediction(
+                    text=final_text,
+                    start_logit=pred.start_logit,
+                    end_logit=pred.end_logit,
+                )
+            )
 
         # if we didn't include the empty option in the n-best, include it
         if task == 'squad2.0':
             if '' not in seen_predictions:
-                nbest.append(_NbestPrediction(text='', start_logit=null_start_logit, end_logit=null_end_logit))
+                nbest.append(
+                    _NbestPrediction(
+                        text='', start_logit=null_start_logit, end_logit=null_end_logit
+                    )
+                )
 
             # In very rare edge cases we could only have single null prediction.
             # So we just create a nonce prediction in this case to avoid failure.
             if len(nbest) == 1:
-                nbest.insert(0, _NbestPrediction(text='empty', start_logit=0.0, end_logit=0.0))
+                nbest.insert(
+                    0, _NbestPrediction(
+                        text='empty', start_logit=0.0, end_logit=0.0)
+                )
 
         # In very rare edge cases we could have no valid predictions. So we
         # just create a nonce prediction in this case to avoid failure.
         if not nbest:
-            nbest.append(_NbestPrediction(text='empty', start_logit=0.0, end_logit=0.0))
+            nbest.append(_NbestPrediction(
+                text='empty', start_logit=0.0, end_logit=0.0))
 
         total_scores = []
         best_non_null_entry = None
@@ -427,7 +499,11 @@ def create_squad_answer_texts(task, tokenizer, all_examples, all_encoded_inputs,
                     best_non_null_entry = entry
 
         if task == 'squad2.0':
-            score_diff = score_null - best_non_null_entry.start_logit - best_non_null_entry.end_logit
+            score_diff = (
+                score_null
+                - best_non_null_entry.start_logit
+                - best_non_null_entry.end_logit
+            )
             if score_diff > null_score_diff_threshold:
                 predicted_answer_texts[example.qa_id] = ''
             else:
@@ -437,11 +513,24 @@ def create_squad_answer_texts(task, tokenizer, all_examples, all_encoded_inputs,
     return predicted_answer_texts
 
 
-def create_squad_answer_texts_v2(tokenizer, all_examples, all_encoded_inputs, all_results, n_best_size,
-                                  max_answer_len, start_n_top, end_n_top):
+def create_squad_answer_texts_v2(
+    tokenizer,
+    all_examples,
+    all_encoded_inputs,
+    all_results,
+    n_best_size,
+    max_answer_len,
+    start_n_top,
+    end_n_top,
+):
     _PrelimPrediction = collections.namedtuple(
-        'PrelimPrediction', ['feature_index', 'start_index', 'end_index', 'start_log_prob', 'end_log_prob'])
-    _NbestPrediction = collections.namedtuple('NbestPrediction', ['text', 'start_log_prob', 'end_log_prob'])
+        'PrelimPrediction',
+        ['feature_index', 'start_index', 'end_index',
+            'start_log_prob', 'end_log_prob'],
+    )
+    _NbestPrediction = collections.namedtuple(
+        'NbestPrediction', ['text', 'start_log_prob', 'end_log_prob']
+    )
 
     example_index_to_features = collections.defaultdict(list)
     for feature in all_encoded_inputs:
@@ -451,13 +540,13 @@ def create_squad_answer_texts_v2(tokenizer, all_examples, all_encoded_inputs, al
         unique_id_to_result[result.unique_id] = result
 
     predicted_answer_texts = collections.OrderedDict()
-    for (example_index, example) in enumerate(all_examples):
+    for example_index, example in enumerate(all_examples):
         features = example_index_to_features[example_index]
         prelim_predictions = []
         # keep track of the minimum score of null start+end of position 0
         score_null = 1000000  # large and positive
 
-        for (feature_index, feature) in enumerate(features):
+        for feature_index, feature in enumerate(features):
             result = unique_id_to_result[feature.unique_id]
             cur_null_score = result.cls_logits
 
@@ -494,8 +583,14 @@ def create_squad_answer_texts_v2(tokenizer, all_examples, all_encoded_inputs, al
                             start_index=start_index,
                             end_index=end_index,
                             start_log_prob=start_log_prob,
-                            end_log_prob=end_log_prob))
-        prelim_predictions = sorted(prelim_predictions, key=lambda x: (x.start_log_prob + x.end_log_prob), reverse=True)
+                            end_log_prob=end_log_prob,
+                        )
+                    )
+        prelim_predictions = sorted(
+            prelim_predictions,
+            key=lambda x: (x.start_log_prob + x.end_log_prob),
+            reverse=True,
+        )
 
         seen_predictions = {}
         nbest = []
@@ -505,10 +600,11 @@ def create_squad_answer_texts_v2(tokenizer, all_examples, all_encoded_inputs, al
             feature = features[pred.feature_index]
 
             # Previously used Bert untokenizer
-            tok_tokens = feature.tokens[pred.start_index : (pred.end_index + 1)]
+            tok_tokens = feature.tokens[pred.start_index: (pred.end_index + 1)]
             orig_doc_start = feature.context_subtok_to_tok_idx[pred.start_index]
             orig_doc_end = feature.context_subtok_to_tok_idx[pred.end_index]
-            orig_tokens = example.doc_tokens[orig_doc_start : (orig_doc_end + 1)]
+            orig_tokens = example.doc_tokens[orig_doc_start: (
+                orig_doc_end + 1)]
             tok_text = tokenizer.convert_tokens_to_string(tok_tokens)
 
             # Clean whitespace
@@ -522,12 +618,20 @@ def create_squad_answer_texts_v2(tokenizer, all_examples, all_encoded_inputs, al
 
             seen_predictions[final_text] = True
             nbest.append(
-                _NbestPrediction(text=final_text, start_log_prob=pred.start_log_prob, end_log_prob=pred.end_log_prob))
+                _NbestPrediction(
+                    text=final_text,
+                    start_log_prob=pred.start_log_prob,
+                    end_log_prob=pred.end_log_prob,
+                )
+            )
 
         # In very rare edge cases we could have no valid predictions. So we
         # just create a nonce prediction in this case to avoid failure.
         if not nbest:
-            nbest.append(_NbestPrediction(text='', start_log_prob=-1e6, end_log_prob=-1e6))
+            nbest.append(
+                _NbestPrediction(text='', start_log_prob=-
+                                 1e6, end_log_prob=-1e6)
+            )
 
         total_scores = []
         best_non_null_entry = None
@@ -539,16 +643,42 @@ def create_squad_answer_texts_v2(tokenizer, all_examples, all_encoded_inputs, al
     return predicted_answer_texts
 
 
-def compute_squad_metrics(model_name, task, tokenizer, all_examples, all_encoded_inputs, all_results, n_best_size,
-                          max_answer_len, null_score_diff_threshold=None, start_n_top=None, end_n_top=None, return_text=False):
+def compute_squad_metrics(
+    model_name,
+    task,
+    tokenizer,
+    all_examples,
+    all_encoded_inputs,
+    all_results,
+    n_best_size,
+    max_answer_len,
+    null_score_diff_threshold=None,
+    start_n_top=None,
+    end_n_top=None,
+    return_text=False,
+):
     if model_name not in models.xlnet_models:
         predicted_answer_texts = create_squad_answer_texts(
-            task, tokenizer, all_examples, all_encoded_inputs, all_results, n_best_size, max_answer_len,
-            null_score_diff_threshold)
+            task,
+            tokenizer,
+            all_examples,
+            all_encoded_inputs,
+            all_results,
+            n_best_size,
+            max_answer_len,
+            null_score_diff_threshold,
+        )
     else:
         predicted_answer_texts = create_squad_answer_texts_v2(
-            tokenizer, all_examples, all_encoded_inputs, all_results, n_best_size, max_answer_len,
-            start_n_top, end_n_top)
+            tokenizer,
+            all_examples,
+            all_encoded_inputs,
+            all_results,
+            n_best_size,
+            max_answer_len,
+            start_n_top,
+            end_n_top,
+        )
 
     metrics = squad_evaluate(all_examples, predicted_answer_texts)
     if return_text:

@@ -1,7 +1,8 @@
+import logging
+
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
-import logging
 
 
 class DynamicLinear(nn.Linear):
@@ -14,11 +15,11 @@ class DynamicLinear(nn.Linear):
 
     def add_out_indices(self, count):
         self.out_indices[1] += count
-        #self.out_indices[1] += self.in_indices[1] - self.in_indices[0] + 1
+        # self.out_indices[1] += self.in_indices[1] - self.in_indices[0] + 1
 
     def add_in_indices(self, count):
         self.in_indices[1] += count
-        #self.in_indices[1] += self.out_indices[1] - self.out_indices[0] + 1
+        # self.in_indices[1] += self.out_indices[1] - self.out_indices[0] + 1
 
     def set_indices(self, in_indices, out_indices):
         in_indices = torch.LongTensor(in_indices)
@@ -40,13 +41,16 @@ class DynamicLinear(nn.Linear):
 
     def forward(self, input):
         if self.in_indices is not None:
-            w = self.weight[self.out_indices[0]:self.out_indices[1]+1, self.in_indices[0]:self.in_indices[1]+1].contiguous()
-            b = self.bias[self.out_indices[0]:self.out_indices[1] + 1].contiguous()
-            #logging.info("input.shape={}, self.weight.shape={}, w.shape={}, bias.shape={}",input.shape, self.weight.shape, w.shape, self.bias.shape)
+            w = self.weight[
+                self.out_indices[0]: self.out_indices[1] + 1,
+                self.in_indices[0]: self.in_indices[1] + 1,
+            ].contiguous()
+            b = self.bias[self.out_indices[0]: self.out_indices[1] + 1].contiguous()
+            # logging.info("input.shape={}, self.weight.shape={}, w.shape={}, bias.shape={}",input.shape, self.weight.shape, w.shape, self.bias.shape)
             return F.linear(input, w, b)
         else:
             return super().forward(input)
-    
+
     def build_nn_module(self):
         in_features = self.in_features
         out_features = self.out_features
@@ -59,8 +63,10 @@ class DynamicLinear(nn.Linear):
         else:
             out_features = self.out_features
         return torch.nn.Linear(in_features, out_features, self.bias is not None)
-'''
-# FFN   
+
+
+"""
+# FFN
 fc1 = nn.Linear(528, 528*4)  # 528, 528
 fc2 = nn.Linear(528*4, 528)
 
@@ -86,4 +92,4 @@ fc2.set_indices([0,528*2-1], [0,527])
 # 增大block的channel数
 fc1.set_indices([0,527], [0,528*3-1])
 fc2.set_indices([0,528*3-1], [0,527])
-'''
+"""

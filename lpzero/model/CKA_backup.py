@@ -2,8 +2,9 @@
 # https://github.com/yuanli2333/CKA-Centered-Kernel-Alignment/blob/master/CKA.py
 
 import math
-import torch
+
 import numpy as np
+import torch
 
 
 class CKA(object):
@@ -23,12 +24,15 @@ class CKA(object):
         if sigma is None:
             mdist = np.median(KX[KX != 0])
             sigma = math.sqrt(mdist)
-        KX *= - 0.5 / (sigma * sigma)
+        KX *= -0.5 / (sigma * sigma)
         KX = np.exp(KX)
         return KX
 
     def kernel_HSIC(self, X, Y, sigma):
-        return np.sum(self.centering(self.rbf(X, sigma)) * self.centering(self.rbf(Y, sigma)))
+        return np.sum(
+            self.centering(self.rbf(X, sigma)) *
+            self.centering(self.rbf(Y, sigma))
+        )
 
     def linear_HSIC(self, X, Y):
         L_X = X @ X.T
@@ -62,23 +66,26 @@ class CudaCKA(object):
         return torch.matmul(torch.matmul(H, K), H)
 
     def rbf(self, X, sigma=None):
-        #print("X=", X)
+        # print("X=", X)
         GX = torch.matmul(X, X.T)
-        #print("GX=", GX)
+        # print("GX=", GX)
         KX = torch.diag(GX) - GX + (torch.diag(GX) - GX).T
-        #print("KX=", KX)
+        # print("KX=", KX)
         if sigma is None:
             mdist = torch.median(KX[KX != 0])
-            #print("mdist=", mdist)
+            # print("mdist=", mdist)
             sigma = math.sqrt(mdist)
-        KX *= - 0.5 / (sigma * sigma)
-        #print("sigma=", sigma)
+        KX *= -0.5 / (sigma * sigma)
+        # print("sigma=", sigma)
         KX = torch.exp(KX)
-        #print("KX=",KX)
+        # print("KX=",KX)
         return KX
 
     def kernel_HSIC(self, X, Y, sigma):
-        return torch.sum(self.centering(self.rbf(X, sigma)) * self.centering(self.rbf(Y, sigma)))
+        return torch.sum(
+            self.centering(self.rbf(X, sigma)) *
+            self.centering(self.rbf(Y, sigma))
+        )
 
     def linear_HSIC(self, X, Y):
         L_X = torch.matmul(X, X.T)
@@ -94,20 +101,21 @@ class CudaCKA(object):
 
     def kernel_CKA(self, X, Y, sigma=None):
         import random
+
         o = random.randint(0, 7)
         cuda_str = 'cuda:' + str(o)
         self.device = torch.device(cuda_str)
-        #print("X=", X)
-        #print("Y=", Y)
-        #print("X.shape=", X.shape)
-        #print("Y.shape=", Y.shape)
+        # print("X=", X)
+        # print("Y=", Y)
+        # print("X.shape=", X.shape)
+        # print("Y.shape=", Y.shape)
         X = X.to(self.device)
         Y = Y.to(self.device)
         hsic = self.kernel_HSIC(X, Y, sigma)
         var1 = torch.sqrt(self.kernel_HSIC(X, X, sigma))
         var2 = torch.sqrt(self.kernel_HSIC(Y, Y, sigma))
-        #print("hsic=",hsic)
-        #print("var1=",var1)
-        #print("var2=",var2)
-        #print(hsic / (var1 * var2))
+        # print("hsic=",hsic)
+        # print("var1=",var1)
+        # print("var2=",var2)
+        # print(hsic / (var1 * var2))
         return hsic / (var1 * var2)

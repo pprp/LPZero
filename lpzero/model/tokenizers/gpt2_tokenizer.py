@@ -3,16 +3,32 @@ import tokenizers
 
 
 class Gpt2BasicTokenizer(tokenizers.RobertaBasicTokenizer):
-    def __init__(self, lowercase, vocab_path, merge_path, unk_token='<|unk|>', sep_token='<|sep|>',
-                 pad_token='<|pad|>', bos_token='<|start|>', eos_token='<|end|>'):
-        super(Gpt2BasicTokenizer, self).__init__(lowercase, vocab_path, merge_path)
+    def __init__(
+        self,
+        lowercase,
+        vocab_path,
+        merge_path,
+        unk_token='<|unk|>',
+        sep_token='<|sep|>',
+        pad_token='<|pad|>',
+        bos_token='<|start|>',
+        eos_token='<|end|>',
+    ):
+        super(Gpt2BasicTokenizer, self).__init__(
+            lowercase, vocab_path, merge_path)
 
         self.unk_token = unk_token
         self.sep_token = sep_token
         self.pad_token = pad_token
         self.bos_token = bos_token
         self.eos_token = eos_token
-        self.special_tokens = {self.unk_token, self.sep_token, self.pad_token, self.bos_token, self.eos_token}
+        self.special_tokens = {
+            self.unk_token,
+            self.sep_token,
+            self.pad_token,
+            self.bos_token,
+            self.eos_token,
+        }
 
         self.unk_token_id = self._get_token_id(self.unk_token)
         self.sep_token_id = self._get_token_id(self.sep_token)
@@ -32,7 +48,15 @@ class Gpt2BasicTokenizer(tokenizers.RobertaBasicTokenizer):
 
 
 class Gpt2Tokenizer(Gpt2BasicTokenizer):
-    def __init__(self, lowercase, task, vocab_path, merge_path, max_seq_len, max_abstract_len=None):
+    def __init__(
+        self,
+        lowercase,
+        task,
+        vocab_path,
+        merge_path,
+        max_seq_len,
+        max_abstract_len=None,
+    ):
         super(Gpt2Tokenizer, self).__init__(lowercase, vocab_path, merge_path)
 
         self.task = task
@@ -53,17 +77,22 @@ class Gpt2Tokenizer(Gpt2BasicTokenizer):
         attn_mask = np.array(attn_mask)
 
         token_ids[0] = self.bos_token_id
-        token_ids[1:len(token_ids_a) + 1] = token_ids_a
+        token_ids[1: len(token_ids_a) + 1] = token_ids_a
 
         if token_ids_b is None:
             token_ids[len(token_ids_a) + 1] = self.eos_token_id
-            attn_mask[:len(token_ids_a) + 2] = 0
+            attn_mask[: len(token_ids_a) + 2] = 0
         else:
             token_ids[-self.max_query_len - 1] = self.sep_token_id
-            token_ids[-self.max_query_len:-self.max_query_len + len(token_ids_b)] = token_ids_b
-            token_ids[-self.max_query_len + len(token_ids_b)] = self.eos_token_id
-            attn_mask[:len(token_ids_a) + 1] = 0
-            attn_mask[-self.max_query_len - 1:-self.max_query_len + len(token_ids_b) + 1] = 0
+            token_ids[
+                -self.max_query_len: -self.max_query_len + len(token_ids_b)
+            ] = token_ids_b
+            token_ids[-self.max_query_len +
+                      len(token_ids_b)] = self.eos_token_id
+            attn_mask[: len(token_ids_a) + 1] = 0
+            attn_mask[
+                -self.max_query_len - 1: -self.max_query_len + len(token_ids_b) + 1
+            ] = 0
 
         token_ids = token_ids.tolist()
         attn_mask = attn_mask.tolist()

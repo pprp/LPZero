@@ -1,26 +1,38 @@
+import logging
 import math
+
+import datasets
+import numpy as np
 import torch
 import torch.nn as nn
-import datasets
-import logging
-import numpy as np
-#from .CKA import CKA, CudaCKA
+
+# from .CKA import CKA, CudaCKA
 from .cka import CKA_Minibatch_Grid
 
-#device = torch.device('cuda:5')
-#cuda_cka = CudaCKA(device)
+# device = torch.device('cuda:5')
+# cuda_cka = CudaCKA(device)
+
 
 def gelu(x):
-    return 0.5 * x * (1 + torch.tanh(math.sqrt(2 / math.pi) * (x + 0.044715 * torch.pow(x, 3))))
+    return (
+        0.5
+        * x
+        * (1 + torch.tanh(math.sqrt(2 / math.pi) * (x + 0.044715 * torch.pow(x, 3))))
+    )
 
 
 class BertEmbedding(nn.Module):
     def __init__(self, config):
         super(BertEmbedding, self).__init__()
 
-        self.token_embeddings = nn.Embedding(config.vocab_size, config.hidden_size, padding_idx=config.pad_token_id)
-        self.segment_embeddings = nn.Embedding(config.segment_size, config.hidden_size)
-        self.position_embeddings = nn.Embedding(config.position_size, config.hidden_size)
+        self.token_embeddings = nn.Embedding(
+            config.vocab_size, config.hidden_size, padding_idx=config.pad_token_id
+        )
+        self.segment_embeddings = nn.Embedding(
+            config.segment_size, config.hidden_size)
+        self.position_embeddings = nn.Embedding(
+            config.position_size, config.hidden_size
+        )
         self.layernorm = nn.LayerNorm(config.hidden_size)
         self.dropout = nn.Dropout(config.hidden_dropout_prob)
 
@@ -51,28 +63,40 @@ class BertAttention(nn.Module):
         self.layernorm = nn.LayerNorm(config.hidden_size)
         self.hidden_dropout = nn.Dropout(config.hidden_dropout_prob)
 
-    def forward(self, hidden_states, attn_mask, is_calc_cka = False):
-        #logging.info('hidden_states.shape={}'.format(hidden_states.shape))
+    def forward(self, hidden_states, attn_mask, is_calc_cka=False):
+        # logging.info('hidden_states.shape={}'.format(hidden_states.shape))
         query = self.query(hidden_states)
         key = self.key(hidden_states)
         value = self.value(hidden_states)
-        #logging.info('query.shape={}'.format(query.shape))
+        # logging.info('query.shape={}'.format(query.shape))
 
-        query = query.view(hidden_states.size(0), -1, self.num_attn_heads, self.attn_head_size).permute(0, 2, 1, 3)
-        key = key.view(hidden_states.size(0), -1, self.num_attn_heads, self.attn_head_size).permute(0, 2, 1, 3)
-        value = value.view(hidden_states.size(0), -1, self.num_attn_heads, self.attn_head_size).permute(0, 2, 1, 3)
-        #logging.info('query.shape={}'.format(query.shape))
+        query = query.view(
+            hidden_states.size(0), -1, self.num_attn_heads, self.attn_head_size
+        ).permute(0, 2, 1, 3)
+        key = key.view(
+            hidden_states.size(0), -1, self.num_attn_heads, self.attn_head_size
+        ).permute(0, 2, 1, 3)
+        value = value.view(
+            hidden_states.size(0), -1, self.num_attn_heads, self.attn_head_size
+        ).permute(0, 2, 1, 3)
+        # logging.info('query.shape={}'.format(query.shape))
 
         attn_mask = attn_mask[:, None, None, :]
-        attn_score = torch.matmul(query, key.transpose(-1, -2)) / math.sqrt(self.attn_head_size)
+        attn_score = torch.matmul(query, key.transpose(-1, -2)) / math.sqrt(
+            self.attn_head_size
+        )
         attn_score += attn_mask * -10000.0
         attn_prob = self.attn_dropout(self.softmax(attn_score))
-        #logging.info('attn_score.shape={}'.format(attn_score.shape))
+        # logging.info('attn_score.shape={}'.format(attn_score.shape))
 
         context = torch.matmul(attn_prob, value)
-        context = context.permute(0, 2, 1, 3).contiguous().view(value.size(0), -1, self.all_head_size)
-        #print(context.shape)
-        #print('cka_sum={}'.format(cka_sum))
+        context = (
+            context.permute(0, 2, 1, 3)
+            .contiguous()
+            .view(value.size(0), -1, self.all_head_size)
+        )
+        # print(context.shape)
+        # print('cka_sum={}'.format(cka_sum))
         context = self.hidden_dropout(self.dense(context))
         output = self.layernorm(hidden_states + context)
         return output, attn_score
@@ -85,12 +109,13 @@ class BertAttention(nn.Module):
         flops += self.dense.in_features * self.dense.out_features * seq_len
         return flops
 
+
 class MySupernetBertAttention(nn.Module):
-    def  __init__(self, config):
+    def __init__(self, config):
         super(MySupernetBertAttention, self).__init__()
 
         self.num_attn_heads = config.num_attn_heads
-        #logging.info("MySupernetBertAttention, j={}, self.num_attn_heads={}".format(j, self.num_attn_heads))
+        # logging.info("MySupernetBertAttention, j={}, self.num_attn_heads={}".format(j, self.num_attn_heads))
         self.attn_head_size = config.hidden_size // self.num_attn_heads
         self.all_head_size = self.attn_head_size * self.num_attn_heads
 
@@ -105,52 +130,72 @@ class MySupernetBertAttention(nn.Module):
         self.layernorm = nn.LayerNorm(config.hidden_size)
         self.hidden_dropout = nn.Dropout(config.hidden_dropout_prob)
 
-    def forward(self, hidden_states, attn_mask, is_calc_cka = False, get_cka_pair = False):
-        #logging.info('hidden_states.shape={}'.format(hidden_states.shape))
+    def forward(self, hidden_states, attn_mask, is_calc_cka=False, get_cka_pair=False):
+        # logging.info('hidden_states.shape={}'.format(hidden_states.shape))
         query = self.query(hidden_states)
         key = self.key(hidden_states)
         value = self.value(hidden_states)
-        #logging.info('query.shape={}'.format(query.shape))
+        # logging.info('query.shape={}'.format(query.shape))
 
-        query = query.view(hidden_states.size(0), -1, self.num_attn_heads, self.attn_head_size).permute(0, 2, 1, 3)
-        key = key.view(hidden_states.size(0), -1, self.num_attn_heads, self.attn_head_size).permute(0, 2, 1, 3)
-        value = value.view(hidden_states.size(0), -1, self.num_attn_heads, self.attn_head_size).permute(0, 2, 1, 3)
-        #logging.info('query.shape={}'.format(query.shape))
+        query = query.view(
+            hidden_states.size(0), -1, self.num_attn_heads, self.attn_head_size
+        ).permute(0, 2, 1, 3)
+        key = key.view(
+            hidden_states.size(0), -1, self.num_attn_heads, self.attn_head_size
+        ).permute(0, 2, 1, 3)
+        value = value.view(
+            hidden_states.size(0), -1, self.num_attn_heads, self.attn_head_size
+        ).permute(0, 2, 1, 3)
+        # logging.info('query.shape={}'.format(query.shape))
 
         attn_mask = attn_mask[:, None, None, :]
-        #print(attn_mask)
-        attn_score = torch.matmul(query, key.transpose(-1, -2)) / math.sqrt(self.attn_head_size)
+        # print(attn_mask)
+        attn_score = torch.matmul(query, key.transpose(-1, -2)) / math.sqrt(
+            self.attn_head_size
+        )
         attn_score += attn_mask * -10000.0
         attn_prob = self.attn_dropout(self.softmax(attn_score))
-        #logging.info('attn_score.shape={}'.format(attn_score.shape))
+        # logging.info('attn_score.shape={}'.format(attn_score.shape))
 
         context = torch.matmul(attn_prob, value)
         # [64, 12, 128, 44]
-        c = context.permute(1, 0, 2, 3).contiguous().view(self.num_attn_heads, value.size(0), -1)
-        #logging.info("c.shape={}", format(c.shape))
-        #logging.info("c={}", format(c))
-        context = context.permute(0, 2, 1, 3).contiguous().view(value.size(0), -1, self.all_head_size)
-        #print(context.shape)
+        c = (
+            context.permute(1, 0, 2, 3)
+            .contiguous()
+            .view(self.num_attn_heads, value.size(0), -1)
+        )
+        # logging.info("c.shape={}", format(c.shape))
+        # logging.info("c={}", format(c))
+        context = (
+            context.permute(0, 2, 1, 3)
+            .contiguous()
+            .view(value.size(0), -1, self.all_head_size)
+        )
+        # print(context.shape)
         avg_cka = 0
         if get_cka_pair:
             is_calc_cka = True
         if is_calc_cka:
-            #for now_batch in range(context.shape[0]):
+            # for now_batch in range(context.shape[0]):
             #        for i in range(self.num_attn_heads):
             #            for j in range(self.num_attn_heads):
             #                cka_sum[i][j] += cuda_cka.kernel_CKA(context[now_batch,:,i*self.attn_head_size:(i+1)*self.attn_head_size],
             #                                                     context[now_batch,:,j*self.attn_head_size:(j+1)*self.attn_head_size])
             with torch.no_grad():
-                cka_logger = CKA_Minibatch_Grid(self.num_attn_heads, self.num_attn_heads)
-               # for data_batch in data_loader:
-               #     feature_list_1 = model_1(data_batch)  # len(feature_list_1) = d1
-               #     feature_list_2 = model_2(data_batch)  # len(feature_list_2) = d2
+                cka_logger = CKA_Minibatch_Grid(
+                    self.num_attn_heads, self.num_attn_heads
+                )
+                # for data_batch in data_loader:
+                #     feature_list_1 = model_1(data_batch)  # len(feature_list_1) = d1
+                #     feature_list_2 = model_2(data_batch)  # len(feature_list_2) = d2
                 cka_logger.update(c, c)
                 cka_sum = cka_logger.compute()  # [d1, d2]
-                #logging.info("cka_sum={}".format(cka_sum))
+                # logging.info("cka_sum={}".format(cka_sum))
                 numpy_cka = cka_sum.sum().numpy()
-                avg_cka = (numpy_cka-self.num_attn_heads)/(self.num_attn_heads*self.num_attn_heads-self.num_attn_heads)
-        #print('cka_sum_MySupernetBertAttention={}'.format(cka_sum))
+                avg_cka = (numpy_cka - self.num_attn_heads) / (
+                    self.num_attn_heads * self.num_attn_heads - self.num_attn_heads
+                )
+        # print('cka_sum_MySupernetBertAttention={}'.format(cka_sum))
         context = self.hidden_dropout(self.dense(context))
         output = self.layernorm(hidden_states + context)
         if get_cka_pair:
@@ -218,12 +263,14 @@ class BertMaskedLMHead(nn.Module):
         self.dense = nn.Linear(config.hidden_size, config.hidden_size)
         self.activation = gelu
         self.layernorm = nn.LayerNorm(config.hidden_size)
-        self.lm_decoder = nn.Linear(config.hidden_size, config.vocab_size, bias=False)
+        self.lm_decoder = nn.Linear(
+            config.hidden_size, config.vocab_size, bias=False)
         self.lm_bias = nn.Parameter(torch.zeros(config.vocab_size))
         self.lm_decoder.weight = embedding_weights
 
     def forward(self, hidden_states):
-        hidden_states = self.layernorm(self.activation(self.dense(hidden_states)))
+        hidden_states = self.layernorm(
+            self.activation(self.dense(hidden_states)))
         output = self.lm_decoder(hidden_states) + self.lm_bias
         return output
 
@@ -234,10 +281,14 @@ class BertSingle(nn.Module):
 
         self.use_lm = use_lm
         self.embeddings = BertEmbedding(config)
-        self.encoder = nn.ModuleList([BertTransformerBlock(config) for _ in range(config.num_layers)])
+        self.encoder = nn.ModuleList(
+            [BertTransformerBlock(config) for _ in range(config.num_layers)]
+        )
 
         if self.use_lm:
-            self.lm_head = BertMaskedLMHead(config, self.embeddings.token_embeddings.weight)
+            self.lm_head = BertMaskedLMHead(
+                config, self.embeddings.token_embeddings.weight
+            )
         self._init_weights()
 
     def forward(self, token_ids, segment_ids, position_ids, attn_mask):
@@ -250,9 +301,9 @@ class BertSingle(nn.Module):
             all_attn_score.append(attn_score)
             all_attn_outputs.append(attn_output)
             all_ffn_outputs.append(output)
-            #logging.info(
-             #   'attn_output.shape:{},output.shape:{}'.format(
-              #      attn_output.shape, output.shape))
+            # logging.info(
+            #   'attn_output.shape:{},output.shape:{}'.format(
+            #      attn_output.shape, output.shape))
 
         if self.use_lm:
             output = self.lm_head(output)
@@ -276,7 +327,9 @@ class Bert(nn.Module):
         self.task = task
         self.return_hid = return_hid
         self.embeddings = BertEmbedding(config)
-        self.encoder = nn.ModuleList([BertTransformerBlock(config) for _ in range(config.num_layers)])
+        self.encoder = nn.ModuleList(
+            [BertTransformerBlock(config) for _ in range(config.num_layers)]
+        )
 
         if task in datasets.glue_tasks:
             self.num_classes = datasets.glue_num_classes[task]
@@ -301,7 +354,7 @@ class Bert(nn.Module):
         output = self.embeddings(token_ids, segment_ids, position_ids)
         all_ffn_outputs.append(output)
         for layer in self.encoder:
-            output, attn_output, attn_score= layer(output, attn_mask)
+            output, attn_output, attn_score = layer(output, attn_mask)
             all_attn_outputs.append(attn_output)
             all_ffn_outputs.append(output)
 
@@ -315,7 +368,12 @@ class Bert(nn.Module):
             output = self.classifier(output)
             start_logits, end_logits = output.split(1, dim=-1)
             if self.return_hid:
-                return start_logits.squeeze(-1), end_logits.squeeze(-1), all_attn_outputs, all_ffn_outputs
+                return (
+                    start_logits.squeeze(-1),
+                    end_logits.squeeze(-1),
+                    all_attn_outputs,
+                    all_ffn_outputs,
+                )
             return start_logits.squeeze(-1), end_logits.squeeze(-1)
         elif self.task in datasets.multi_choice_tasks:
             output = self.cls_pooler(output[:, 0])

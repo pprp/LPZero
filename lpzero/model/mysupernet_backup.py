@@ -1,20 +1,23 @@
-import torch.nn as nn
 import datasets
 import models
-from .mobile_bert import MobileBertTransformerBlockForSupernet
-from .transformer_multibranch_v2 import TransformerEncoderLayer as MultiBranchBlockForSupernet
-from utils import calc_params
-from sklearn.decomposition import PCA
 import numpy as np
-from .pca_torch import pca_torch
+import torch.nn as nn
+from sklearn.decomposition import PCA
+from utils import calc_params
 
+from .mobile_bert import MobileBertTransformerBlockForSupernet
+from .pca_torch import pca_torch
+from .transformer_multibranch_v2 import (
+    TransformerEncoderLayer as MultiBranchBlockForSupernet,
+)
 
 
 class MySupernetFeedForwardNetwork(nn.Module):
     def __init__(self, config):
         super(MySupernetFeedForwardNetwork, self).__init__()
 
-        ffn_hidden_size = int(config.ffn_hidden_size * config.ffn_expansion_ratio)
+        ffn_hidden_size = int(config.ffn_hidden_size *
+                              config.ffn_expansion_ratio)
         self.dense1 = nn.Linear(config.hidden_size, ffn_hidden_size)
         self.activation = models.gelu
         self.dense2 = nn.Linear(ffn_hidden_size, config.hidden_size)
@@ -24,7 +27,7 @@ class MySupernetFeedForwardNetwork(nn.Module):
 
     def forward(self, hidden_states, is_calc_pca):
         output = self.activation(self.dense1(hidden_states))
-        pca_sum = np.zeros(min(output.shape[1], output.shape[2]));
+        pca_sum = np.zeros(min(output.shape[1], output.shape[2]))
         if is_calc_pca:
             for i in range(output.shape[0]):
                 pca_line = PCA().fit(output[i].clone().detach().cpu().numpy())
@@ -49,7 +52,9 @@ class MySupernetTransformerBlock(nn.Module):
         self.ffn = MySupernetFeedForwardNetwork(config)
 
     def forward(self, hidden_states, attn_mask, is_calc_pca_cka):
-        output, attn_score, cka_sum = self.attention(hidden_states, attn_mask, is_calc_pca_cka)
+        output, attn_score, cka_sum = self.attention(
+            hidden_states, attn_mask, is_calc_pca_cka
+        )
         output, pca_sum = self.ffn(output, is_calc_pca_cka)
         return output, attn_score, cka_sum, pca_sum
 
@@ -72,14 +77,19 @@ class MySupernetSingle(nn.Module):
         else:
             self.embeddings = models.BertEmbedding(config)
 
-
-        config_mobile_bert = models.select_config('mobile_bert_for_supernet', True)
+        config_mobile_bert = models.select_config(
+            'mobile_bert_for_supernet', True)
         config_multi_branch = models.select_config('multi_branch', True)
         self.num_layers = config.num_layers
         layers = []
         for i in range(config.num_layers):
-            layer = nn.ModuleList([MySupernetTransformerBlock(config), MobileBertTransformerBlockForSupernet(config_mobile_bert),
-                                   MultiBranchBlockForSupernet(config_multi_branch)])
+            layer = nn.ModuleList(
+                [
+                    MySupernetTransformerBlock(config),
+                    MobileBertTransformerBlockForSupernet(config_mobile_bert),
+                    MultiBranchBlockForSupernet(config_multi_branch),
+                ]
+            )
             layers.append(layer)
 
         self.encoder = nn.Sequential(*layers)
@@ -87,10 +97,20 @@ class MySupernetSingle(nn.Module):
         if self.use_fit_dense:
             self.fit_dense = nn.Linear(config.hidden_size, config.fit_size)
         if self.use_lm:
-            self.lm_head = models.BertMaskedLMHead(config, self.embeddings.token_embeddings.weight)
+            self.lm_head = models.BertMaskedLMHead(
+                config, self.embeddings.token_embeddings.weight
+            )
         self._init_weights()
 
-    def forward(self, token_ids, segment_ids, position_ids, attn_mask, select_arch=[], is_calc_pca_cka = False):
+    def forward(
+        self,
+        token_ids,
+        segment_ids,
+        position_ids,
+        attn_mask,
+        select_arch=[],
+        is_calc_pca_cka=False,
+    ):
         all_attn_outputs, all_ffn_outputs = [], []
         output = self.embeddings(token_ids, segment_ids, position_ids)
         if self.use_fit_dense:
@@ -99,21 +119,27 @@ class MySupernetSingle(nn.Module):
             all_ffn_outputs.append(output)
 
         import random
+
         if select_arch == []:
             for i in range(self.num_layers):
                 select_arch.append(random.randint(0, 1))
 
         import logging
+
         First = True
         for archs, arch_id in zip(self.encoder, select_arch):
             if First:
-                output, attn_output, cka_sum, pca_sum = archs[arch_id](output, attn_mask, is_calc_pca_cka)
+                output, attn_output, cka_sum, pca_sum = archs[arch_id](
+                    output, attn_mask, is_calc_pca_cka
+                )
                 First = False
             else:
-                output, attn_output, one_cka, one_pca = archs[arch_id](output, attn_mask, is_calc_pca_cka)
+                output, attn_output, one_cka, one_pca = archs[arch_id](
+                    output, attn_mask, is_calc_pca_cka
+                )
                 pca_sum += one_pca
                 cka_sum += one_cka
-           # logging.info('attn_output.shape={}'.format(attn_output.shape))
+            # logging.info('attn_output.shape={}'.format(attn_output.shape))
             all_attn_outputs.append(attn_output)
             if self.use_fit_dense:
                 all_ffn_outputs.append(self.fit_dense(output))
@@ -128,7 +154,6 @@ class MySupernetSingle(nn.Module):
 
         return output, all_attn_outputs, all_ffn_outputs, cka_sum, pca_sum
 
-
     def _init_weights(self):
         for name, m in self.named_modules():
             if isinstance(m, (nn.Linear, nn.Embedding)):
@@ -141,7 +166,9 @@ class MySupernetSingle(nn.Module):
 
 
 class MySupernet(nn.Module):
-    def __init__(self, config, task, return_hidden_states=False, ret_all_ffn_hidden_states=False):
+    def __init__(
+        self, config, task, return_hidden_states=False, ret_all_ffn_hidden_states=False
+    ):
         super(MySupernet, self).__init__()
 
         self.use_fit_dense = config.use_fit_dense
@@ -153,13 +180,19 @@ class MySupernet(nn.Module):
         else:
             self.embeddings = models.BertEmbedding(config)
 
-        config_mobile_bert = models.select_config('mobile_bert_for_supernet', True)
+        config_mobile_bert = models.select_config(
+            'mobile_bert_for_supernet', True)
         config_multi_branch = models.select_config('multi_branch', True)
         self.num_layers = config.num_layers
         layers = []
         for i in range(config.num_layers):
-            layer = nn.ModuleList([MySupernetTransformerBlock(config), MobileBertTransformerBlockForSupernet(config_mobile_bert),
-                                   MultiBranchBlockForSupernet(config_multi_branch)])
+            layer = nn.ModuleList(
+                [
+                    MySupernetTransformerBlock(config),
+                    MobileBertTransformerBlockForSupernet(config_mobile_bert),
+                    MultiBranchBlockForSupernet(config_multi_branch),
+                ]
+            )
             layers.append(layer)
 
         self.encoder = nn.Sequential(*layers)
@@ -193,14 +226,16 @@ class MySupernet(nn.Module):
             all_ffn_outputs.append(output)
 
         import random
+
         if select_arch == []:
             for i in range(self.num_layers):
                 select_arch.append(random.randint(0, 1))
 
         import logging
+
         for archs, arch_id in zip(self.encoder, select_arch):
             output, attn_output = archs[arch_id](output, attn_mask)
-           # logging.info('attn_output.shape={}'.format(attn_output.shape))
+            # logging.info('attn_output.shape={}'.format(attn_output.shape))
             all_attn_outputs.append(attn_output)
             if self.use_fit_dense:
                 all_ffn_outputs.append(self.fit_dense(output))
@@ -217,7 +252,12 @@ class MySupernet(nn.Module):
             output = self.classifier(output)
             start_logits, end_logits = output.split(1, dim=-1)
             if self.return_hidden_states:
-                return start_logits.squeeze(-1), end_logits.squeeze(-1), all_attn_outputs, all_ffn_outputs
+                return (
+                    start_logits.squeeze(-1),
+                    end_logits.squeeze(-1),
+                    all_attn_outputs,
+                    all_ffn_outputs,
+                )
             return start_logits.squeeze(-1), end_logits.squeeze(-1)
         elif self.task in datasets.multi_choice_tasks:
             output = self.cls_pooler(output[:, 0])
@@ -239,7 +279,9 @@ class MySupernet(nn.Module):
 
 
 class MultiTaskMySupernet(nn.Module):
-    def __init__(self, config, task, return_hidden_states=False, ret_all_ffn_hidden_states=False):
+    def __init__(
+        self, config, task, return_hidden_states=False, ret_all_ffn_hidden_states=False
+    ):
         super(MultiTaskMySupernet, self).__init__()
 
         self.use_fit_dense = config.use_fit_dense
@@ -251,13 +293,19 @@ class MultiTaskMySupernet(nn.Module):
         else:
             self.embeddings = models.BertEmbedding(config)
 
-        config_mobile_bert = models.select_config('mobile_bert_for_supernet', True)
+        config_mobile_bert = models.select_config(
+            'mobile_bert_for_supernet', True)
         config_multi_branch = models.select_config('multi_branch', True)
         self.num_layers = config.num_layers
         layers = []
         for i in range(config.num_layers):
-            layer = nn.ModuleList([MySupernetTransformerBlock(config), MobileBertTransformerBlockForSupernet(config_mobile_bert),
-                                   MultiBranchBlockForSupernet(config_multi_branch)])
+            layer = nn.ModuleList(
+                [
+                    MySupernetTransformerBlock(config),
+                    MobileBertTransformerBlockForSupernet(config_mobile_bert),
+                    MultiBranchBlockForSupernet(config_multi_branch),
+                ]
+            )
             layers.append(layer)
 
         self.encoder = nn.Sequential(*layers)
@@ -272,7 +320,9 @@ class MultiTaskMySupernet(nn.Module):
             self.classifiers.append(nn.Linear(config.hidden_size, num_classes))
         self._init_weights()
 
-    def forward(self, task_id, token_ids, segment_ids, position_ids, attn_mask, select_arch=[]):
+    def forward(
+        self, task_id, token_ids, segment_ids, position_ids, attn_mask, select_arch=[]
+    ):
         if self.task in datasets.multi_choice_tasks:
             num_choices = token_ids.size(1)
             token_ids = token_ids.view(-1, token_ids.size(-1))
@@ -288,14 +338,16 @@ class MultiTaskMySupernet(nn.Module):
             all_ffn_outputs.append(output)
 
         import random
+
         if select_arch == []:
             for i in range(self.num_layers):
                 select_arch.append(random.randint(0, 1))
 
         import logging
+
         for archs, arch_id in zip(self.encoder, select_arch):
             output, attn_output = archs[arch_id](output, attn_mask)
-           # logging.info('attn_output.shape={}'.format(attn_output.shape))
+            # logging.info('attn_output.shape={}'.format(attn_output.shape))
             all_attn_outputs.append(attn_output)
             if self.use_fit_dense:
                 all_ffn_outputs.append(self.fit_dense(output))

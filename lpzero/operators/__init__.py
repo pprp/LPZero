@@ -56,10 +56,12 @@ def get_zc_function(name):
 
 def load_all():
     # from .zc_inputs import compute_hessian  # noqa: F401
-    from .zc_inputs import compute_jacobs # noqa: F401
     from .zc_inputs import compute_activation  # noqa: F401
-    from .zc_inputs import compute_head  # noqa: F401
-    from .zc_inputs import compute_softmax  # noqa: F401
     from .zc_inputs import compute_gradient  # noqa: F401
+    from .zc_inputs import compute_head  # noqa: F401
+    from .zc_inputs import compute_jacobs  # noqa: F401
+    from .zc_inputs import compute_softmax  # noqa: F401
     from .zc_inputs import compute_weight  # noqa: F401
+
+
 load_all()

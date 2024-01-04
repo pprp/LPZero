@@ -1,6 +1,7 @@
 from typing import Sequence
-from torch import Tensor
+
 import torch
+from torch import Tensor
 from torch.nn import Module
 
 
@@ -27,7 +28,11 @@ def linear_hsic(k: Tensor, l: Tensor, unbiased: bool = True) -> Tensor:
         k.fill_diagonal_(0)
         l.fill_diagonal_(0)
         kl = torch.matmul(k, l)
-        score = torch.trace(kl) + k.sum() * l.sum() / ((m - 1) * (m - 2)) - 2 * kl.sum() / (m - 2)
+        score = (
+            torch.trace(kl)
+            + k.sum() * l.sum() / ((m - 1) * (m - 2))
+            - 2 * kl.sum() / (m - 2)
+        )
         return score / (m * (m - 3))
     else:
         k, l = centering(k), centering(l)
@@ -62,7 +67,7 @@ class CKA_Minibatch(Module):
 
     def update(self, x1: Tensor, x2: Tensor, gram: bool = False) -> None:
         """
-            gram: if true, the method takes gram matrix as input
+        gram: if true, the method takes gram matrix as input
         """
         assert x1.shape[0] == x2.shape[0], 'Input must have the same batch size'
         self.total += 1
@@ -78,20 +83,21 @@ class CKA_Minibatch(Module):
         cross_score = sum(self.cross_hsic) / self.total
         self_score1 = sum(self.self_hsic1) / self.total
         self_score2 = sum(self.self_hsic2) / self.total
-        #print("cross_score=",cross_score)
-        #print("self_score1=", self_score1)
-        #print("self_score2=", self_score2)
+        # print("cross_score=",cross_score)
+        # print("self_score1=", self_score1)
+        # print("self_score2=", self_score2)
         return cross_score / torch.sqrt(self_score1 * self_score2)
 
 
 class CKA_Minibatch_Grid(Module):
-    '''
+    """
     Compute CKA for a 2D grid of features
-    '''
+    """
 
     def __init__(self, dim1: int, dim2: int):
         super().__init__()
-        self.cka_loggers = [[CKA_Minibatch() for _ in range(dim2)] for _ in range(dim1)]
+        self.cka_loggers = [[CKA_Minibatch() for _ in range(dim2)]
+                            for _ in range(dim1)]
         self.dim1 = dim1
         self.dim2 = dim2
 
@@ -100,14 +106,16 @@ class CKA_Minibatch_Grid(Module):
             for j in range(self.dim2):
                 self.cka_loggers[i][j].reset()
 
-    def update(self, x1: Sequence[Tensor], x2: Sequence[Tensor], gram: bool = False) -> None:
+    def update(
+        self, x1: Sequence[Tensor], x2: Sequence[Tensor], gram: bool = False
+    ) -> None:
         assert len(x1) == self.dim1, 'Grid dim0 mismatch'
         assert len(x2) == self.dim2, 'Grid dim1 mismatch'
         if not gram:
-            #for x in x1:
+            # for x in x1:
             #    print('x_x1.size={}'.format(x.size()))
             x1 = [torch.matmul(x, x.transpose(0, 1)) for x in x1]
-            #for x in x2:
+            # for x in x2:
             #    print('x_x2.size={}'.format(x.size()))
             x2 = [torch.matmul(x, x.transpose(0, 1)) for x in x2]
         for i in range(self.dim1):

@@ -2,6 +2,7 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 
+
 class PKD(nn.Module):
     def __init__(self):
         super().__init__()
@@ -22,9 +23,9 @@ class PKD(nn.Module):
         assert len(feat.shape) == 3
         B, N, C = feat.shape
 
-        feat = feat.transpose(-2, -1) # [B, C, N]
+        feat = feat.transpose(-2, -1)  # [B, C, N]
         mean = feat.mean(dim=-1, keepdim=True)
         std = feat.std(dim=-1, keepdim=True)
         feat = (feat - mean) / (std + 1e-6)
 
-        return feat.transpose(-2, -1) # [B, N, C]
+        return feat.transpose(-2, -1)  # [B, N, C]

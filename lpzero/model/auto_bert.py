@@ -1,6 +1,6 @@
-import torch.nn as nn
 import datasets
 import models
+import torch.nn as nn
 
 
 class AutoBertFeedForwardNetwork(nn.Module):
@@ -15,8 +15,12 @@ class AutoBertFeedForwardNetwork(nn.Module):
 
     def forward(self, hidden_states, ffn_func, expansion_ratio):
         expansion_hidden_size = int(expansion_ratio * self.ffn_hidden_size)
-        wb1 = [self.dense1.weight.t()[:, :expansion_hidden_size], self.dense1.bias[:expansion_hidden_size]]
-        wb2 = [self.dense2.weight.t()[:expansion_hidden_size, :], self.dense2.bias]
+        wb1 = [
+            self.dense1.weight.t()[:, :expansion_hidden_size],
+            self.dense1.bias[:expansion_hidden_size],
+        ]
+        wb2 = [self.dense2.weight.t()[:expansion_hidden_size, :],
+               self.dense2.bias]
         try:
             output = self.dropout(ffn_func(hidden_states, wb1, wb2))
         except RuntimeError as e:
@@ -31,9 +35,14 @@ class AutoBertTransformerBlock(nn.Module):
         super(AutoBertTransformerBlock, self).__init__()
 
         self.attention = models.BertAttention(config)
-        self.all_ffn = nn.ModuleList([AutoBertFeedForwardNetwork(config) for _ in range(config.max_stacked_ffn)])
+        self.all_ffn = nn.ModuleList(
+            [AutoBertFeedForwardNetwork(config)
+             for _ in range(config.max_stacked_ffn)]
+        )
 
-    def forward(self, hidden_states, attn_mask, ffn_func, num_stacked_ffn, expansion_ratio):
+    def forward(
+        self, hidden_states, attn_mask, ffn_func, num_stacked_ffn, expansion_ratio
+    ):
         output, attn_score = self.attention(hidden_states, attn_mask)
         all_ffn_hidden_states = []
         for layer in self.all_ffn[:num_stacked_ffn]:
@@ -52,15 +61,28 @@ class AutoBertSingle(nn.Module):
         self.use_lm = use_lm
         self.expansion_ratio_map = config.expansion_ratio_map
         self.embeddings = models.MobileBertEmbedding(config)
-        self.encoder = nn.ModuleList([AutoBertTransformerBlock(config) for _ in range(config.num_layers)])
+        self.encoder = nn.ModuleList(
+            [AutoBertTransformerBlock(config)
+             for _ in range(config.num_layers)]
+        )
 
         if self.use_fit_dense:
             self.fit_dense = nn.Linear(config.hidden_size, config.fit_size)
         if self.use_lm:
-            self.lm_head = models.BertMaskedLMHead(config, self.embeddings.token_embeddings.weight)
+            self.lm_head = models.BertMaskedLMHead(
+                config, self.embeddings.token_embeddings.weight
+            )
         self._init_weights()
 
-    def forward(self, token_ids, segment_ids, position_ids, attn_mask, entire_ffn_func, entire_linear_idx):
+    def forward(
+        self,
+        token_ids,
+        segment_ids,
+        position_ids,
+        attn_mask,
+        entire_ffn_func,
+        entire_linear_idx,
+    ):
         all_attn_outputs, all_ffn_outputs = [], []
         output = self.embeddings(token_ids, segment_ids, position_ids)
         if self.use_fit_dense:
@@ -70,9 +92,13 @@ class AutoBertSingle(nn.Module):
 
         for i, layer in enumerate(self.encoder):
             cur_linear_idx = entire_linear_idx[i]
-            num_stacked_ffn, expansion_ratio = int(cur_linear_idx.split('_')[0]), self.expansion_ratio_map[cur_linear_idx]
+            num_stacked_ffn, expansion_ratio = (
+                int(cur_linear_idx.split('_')[0]),
+                self.expansion_ratio_map[cur_linear_idx],
+            )
             output, attn_output = layer(
-                output, attn_mask, entire_ffn_func[i], num_stacked_ffn, expansion_ratio)
+                output, attn_mask, entire_ffn_func[i], num_stacked_ffn, expansion_ratio
+            )
             if output is None:
                 return [None] * 3
 
@@ -106,7 +132,10 @@ class AutoBert(nn.Module):
         self.return_hid = return_hid
         self.expansion_ratio_map = config.expansion_ratio_map
         self.embeddings = models.MobileBertEmbedding(config)
-        self.encoder = nn.ModuleList([AutoBertTransformerBlock(config) for _ in range(config.num_layers)])
+        self.encoder = nn.ModuleList(
+            [AutoBertTransformerBlock(config)
+             for _ in range(config.num_layers)]
+        )
 
         if self.use_fit_dense:
             self.fit_dense = nn.Linear(config.hidden_size, config.fit_size)
@@ -121,7 +150,15 @@ class AutoBert(nn.Module):
         self.classifier = nn.Linear(config.hidden_size, self.num_classes)
         self._init_weights()
 
-    def forward(self, token_ids, segment_ids, position_ids, attn_mask, entire_ffn_func, entire_linear_idx):
+    def forward(
+        self,
+        token_ids,
+        segment_ids,
+        position_ids,
+        attn_mask,
+        entire_ffn_func,
+        entire_linear_idx,
+    ):
         if self.task in datasets.multi_choice_tasks:
             num_choices = token_ids.size(1)
             token_ids = token_ids.view(-1, token_ids.size(-1))
@@ -138,9 +175,13 @@ class AutoBert(nn.Module):
 
         for i, layer in enumerate(self.encoder):
             cur_linear_idx = entire_linear_idx[i]
-            num_stacked_ffn, expansion_ratio = int(cur_linear_idx.split('_')[0]), self.expansion_ratio_map[cur_linear_idx]
+            num_stacked_ffn, expansion_ratio = (
+                int(cur_linear_idx.split('_')[0]),
+                self.expansion_ratio_map[cur_linear_idx],
+            )
             output, attn_output = layer(
-                output, attn_mask, entire_ffn_func[i], num_stacked_ffn, expansion_ratio)
+                output, attn_mask, entire_ffn_func[i], num_stacked_ffn, expansion_ratio
+            )
             if output is None:
                 return [None] * 3
 
@@ -160,7 +201,12 @@ class AutoBert(nn.Module):
             output = self.classifier(output)
             start_logits, end_logits = output.split(1, dim=-1)
             if self.return_hid:
-                return start_logits.squeeze(-1), end_logits.squeeze(-1), all_attn_outputs, all_ffn_outputs
+                return (
+                    start_logits.squeeze(-1),
+                    end_logits.squeeze(-1),
+                    all_attn_outputs,
+                    all_ffn_outputs,
+                )
             return start_logits.squeeze(-1), end_logits.squeeze(-1)
         elif self.task in datasets.multi_choice_tasks:
             output = self.cls_pooler(output[:, 0])
@@ -187,7 +233,10 @@ class MultiTaskBert(nn.Module):
 
         self.return_hid = return_hid
         self.embeddings = models.BertEmbedding(config)
-        self.encoder = nn.ModuleList([models.BertTransformerBlock(config) for _ in range(config.num_layers)])
+        self.encoder = nn.ModuleList(
+            [models.BertTransformerBlock(config)
+             for _ in range(config.num_layers)]
+        )
 
         self.cls_pooler = models.BertClsPooler(config)
         self.classifiers = nn.ModuleList([])
@@ -201,7 +250,7 @@ class MultiTaskBert(nn.Module):
         output = self.embeddings(token_ids, segment_ids, position_ids)
         all_ffn_outputs.append(output)
         for layer in self.encoder:
-            output, attn_output, attn_score  = layer(output, attn_mask)
+            output, attn_output, attn_score = layer(output, attn_mask)
             all_attn_outputs.append(attn_output)
             all_ffn_outputs.append(output)
 
@@ -231,7 +280,10 @@ class MultiTaskAutoBert(nn.Module):
         self.return_hid = return_hid
         self.expansion_ratio_map = config.expansion_ratio_map
         self.embeddings = models.MobileBertEmbedding(config)
-        self.encoder = nn.ModuleList([AutoBertTransformerBlock(config) for _ in range(config.num_layers)])
+        self.encoder = nn.ModuleList(
+            [AutoBertTransformerBlock(config)
+             for _ in range(config.num_layers)]
+        )
 
         if self.use_fit_dense:
             self.fit_dense = nn.Linear(config.hidden_size, config.fit_size)
@@ -243,7 +295,16 @@ class MultiTaskAutoBert(nn.Module):
             self.classifiers.append(nn.Linear(config.hidden_size, num_classes))
         self._init_weights()
 
-    def forward(self, task_id, token_ids, segment_ids, position_ids, attn_mask, entire_ffn_func, entire_linear_idx):
+    def forward(
+        self,
+        task_id,
+        token_ids,
+        segment_ids,
+        position_ids,
+        attn_mask,
+        entire_ffn_func,
+        entire_linear_idx,
+    ):
         all_attn_outputs, all_ffn_outputs = [], []
         output = self.embeddings(token_ids, segment_ids, position_ids)
         if self.use_fit_dense:
@@ -253,9 +314,13 @@ class MultiTaskAutoBert(nn.Module):
 
         for i, layer in enumerate(self.encoder):
             cur_linear_idx = entire_linear_idx[i]
-            num_stacked_ffn, expansion_ratio = int(cur_linear_idx.split('_')[0]), self.expansion_ratio_map[cur_linear_idx]
+            num_stacked_ffn, expansion_ratio = (
+                int(cur_linear_idx.split('_')[0]),
+                self.expansion_ratio_map[cur_linear_idx],
+            )
             output, attn_output = layer(
-                output, attn_mask, entire_ffn_func[i], num_stacked_ffn, expansion_ratio)
+                output, attn_mask, entire_ffn_func[i], num_stacked_ffn, expansion_ratio
+            )
             if output is None:
                 return [None] * 3
 
@@ -291,15 +356,28 @@ class AutoTinyBertSingle(nn.Module):
         self.use_lm = use_lm
         self.expansion_ratio_map = config.expansion_ratio_map
         self.embeddings = models.BertEmbedding(config)
-        self.encoder = nn.ModuleList([AutoBertTransformerBlock(config) for _ in range(config.num_layers)])
+        self.encoder = nn.ModuleList(
+            [AutoBertTransformerBlock(config)
+             for _ in range(config.num_layers)]
+        )
 
         if self.use_fit_dense:
             self.fit_dense = nn.Linear(config.hidden_size, config.fit_size)
         if self.use_lm:
-            self.lm_head = models.BertMaskedLMHead(config, self.embeddings.token_embeddings.weight)
+            self.lm_head = models.BertMaskedLMHead(
+                config, self.embeddings.token_embeddings.weight
+            )
         self._init_weights()
 
-    def forward(self, token_ids, segment_ids, position_ids, attn_mask, entire_ffn_func, entire_linear_idx):
+    def forward(
+        self,
+        token_ids,
+        segment_ids,
+        position_ids,
+        attn_mask,
+        entire_ffn_func,
+        entire_linear_idx,
+    ):
         all_attn_outputs, all_ffn_outputs = [], []
         output = self.embeddings(token_ids, segment_ids, position_ids)
         if self.use_fit_dense:
@@ -309,9 +387,13 @@ class AutoTinyBertSingle(nn.Module):
 
         for i, layer in enumerate(self.encoder):
             cur_linear_idx = entire_linear_idx[i]
-            num_stacked_ffn, expansion_ratio = int(cur_linear_idx.split('_')[0]), self.expansion_ratio_map[cur_linear_idx]
+            num_stacked_ffn, expansion_ratio = (
+                int(cur_linear_idx.split('_')[0]),
+                self.expansion_ratio_map[cur_linear_idx],
+            )
             output, attn_output = layer(
-                output, attn_mask, entire_ffn_func[i], num_stacked_ffn, expansion_ratio)
+                output, attn_mask, entire_ffn_func[i], num_stacked_ffn, expansion_ratio
+            )
             if output is None:
                 return [None] * 3
 
@@ -345,7 +427,10 @@ class AutoTinyBert(nn.Module):
         self.return_hid = return_hid
         self.expansion_ratio_map = config.expansion_ratio_map
         self.embeddings = models.BertEmbedding(config)
-        self.encoder = nn.ModuleList([AutoBertTransformerBlock(config) for _ in range(config.num_layers)])
+        self.encoder = nn.ModuleList(
+            [AutoBertTransformerBlock(config)
+             for _ in range(config.num_layers)]
+        )
 
         if self.use_fit_dense:
             self.fit_dense = nn.Linear(config.hidden_size, config.fit_size)
@@ -360,7 +445,15 @@ class AutoTinyBert(nn.Module):
         self.classifier = nn.Linear(config.hidden_size, self.num_classes)
         self._init_weights()
 
-    def forward(self, token_ids, segment_ids, position_ids, attn_mask, entire_ffn_func, entire_linear_idx):
+    def forward(
+        self,
+        token_ids,
+        segment_ids,
+        position_ids,
+        attn_mask,
+        entire_ffn_func,
+        entire_linear_idx,
+    ):
         if self.task in datasets.multi_choice_tasks:
             num_choices = token_ids.size(1)
             token_ids = token_ids.view(-1, token_ids.size(-1))
@@ -377,9 +470,13 @@ class AutoTinyBert(nn.Module):
 
         for i, layer in enumerate(self.encoder):
             cur_linear_idx = entire_linear_idx[i]
-            num_stacked_ffn, expansion_ratio = int(cur_linear_idx.split('_')[0]), self.expansion_ratio_map[cur_linear_idx]
+            num_stacked_ffn, expansion_ratio = (
+                int(cur_linear_idx.split('_')[0]),
+                self.expansion_ratio_map[cur_linear_idx],
+            )
             output, attn_output = layer(
-                output, attn_mask, entire_ffn_func[i], num_stacked_ffn, expansion_ratio)
+                output, attn_mask, entire_ffn_func[i], num_stacked_ffn, expansion_ratio
+            )
             if output is None:
                 return [None] * 3
 
@@ -399,7 +496,12 @@ class AutoTinyBert(nn.Module):
             output = self.classifier(output)
             start_logits, end_logits = output.split(1, dim=-1)
             if self.return_hid:
-                return start_logits.squeeze(-1), end_logits.squeeze(-1), all_attn_outputs, all_ffn_outputs
+                return (
+                    start_logits.squeeze(-1),
+                    end_logits.squeeze(-1),
+                    all_attn_outputs,
+                    all_ffn_outputs,
+                )
             return start_logits.squeeze(-1), end_logits.squeeze(-1)
         elif self.task in datasets.multi_choice_tasks:
             output = self.cls_pooler(output[:, 0])
