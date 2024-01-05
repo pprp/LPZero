@@ -1,16 +1,17 @@
-import os
-import re
-import random
-import torch
-import numpy as np
-import lightgbm as lgb
-import pandas as pd
 import logging
-from copy import deepcopy
-from deap import gp
-from sklearn.model_selection import train_test_split
-from hyperopt import STATUS_OK, Trials, hp, space_eval, tpe, fmin
+import os
+import random
+import re
 from contextlib import redirect_stdout
+from copy import deepcopy
+
+import lightgbm as lgb
+import numpy as np
+import pandas as pd
+import torch
+from deap import gp
+from hyperopt import STATUS_OK, Trials, fmin, hp, space_eval, tpe
+from sklearn.model_selection import train_test_split
 
 
 def get_linear_idx(expr):
@@ -24,8 +25,12 @@ def get_entire_linear_idx(entire_ind):
 
 
 def get_entire_params(param_list, entire_ind):
-    return param_list['embed_fit_dense'] + \
-           sum([(param_list['attn'] + param_list[idx]) for idx in get_entire_linear_idx(entire_ind)])
+    return param_list['embed_fit_dense'] + sum(
+        [
+            (param_list['attn'] + param_list[idx])
+            for idx in get_entire_linear_idx(entire_ind)
+        ]
+    )
 
 
 def get_hash_key_acc(entire_expr, pset, fixed_mat_dir, hash_dict=None, is_stage2=False):
@@ -34,10 +39,18 @@ def get_hash_key_acc(entire_expr, pset, fixed_mat_dir, hash_dict=None, is_stage2
     output = fixed_x
     for layer_id, expr in enumerate(entire_expr):
         if is_stage2:
-            fixed_wb = torch.load(os.path.join(fixed_mat_dir, 'fixed_wb' + str(layer_id + 1) + '_1_1.bin'))
+            fixed_wb = torch.load(
+                os.path.join(fixed_mat_dir, 'fixed_wb' +
+                             str(layer_id + 1) + '_1_1.bin')
+            )
         else:
             linear_idx = get_linear_idx(expr)
-            fixed_wb = torch.load(os.path.join(fixed_mat_dir, 'fixed_wb' + str(layer_id + 1) + '_' + linear_idx + '.bin'))
+            fixed_wb = torch.load(
+                os.path.join(
+                    fixed_mat_dir,
+                    'fixed_wb' + str(layer_id + 1) + '_' + linear_idx + '.bin',
+                )
+            )
         output = entire_func[layer_id](output, *fixed_wb)
 
     hash_key = hash(round(output.sum().item(), 2))
@@ -55,7 +68,7 @@ def mutUniform(individual, expr, pset, min_, max_):
     slice_ = individual.searchSubtree(index)
     type_ = individual[index].ret
     individual[slice_] = expr(pset=pset, type_=type_, min_=min_, max_=max_)
-    return individual,
+    return (individual,)
 
 
 def check_individual(individual, pset, min_height, max_height):
@@ -95,7 +108,9 @@ def check_individual(individual, pset, min_height, max_height):
         return False
 
     # Avoid nested and inconsistent linears
-    all_linear = '(' + '|'.join([op for op in pset.context if op.startswith('linear')]) + ')'
+    all_linear = (
+        '(' + '|'.join([op for op in pset.context if op.startswith('linear')]) + ')'
+    )
     res1 = re.search(all_linear + r'\(' + all_linear, expr)
     res2 = re.findall(all_linear, expr)
     if res1 is not None or res2[0] != res2[1]:
@@ -117,10 +132,10 @@ def sample_individual(expr, pset, min_height, max_height, is_stage2):
     individual = gp.PrimitiveTree.from_string(expr, pset)
     while max_sample:
         cur_ind = deepcopy(individual)
-        cur_ind, = mutUniform(cur_ind, gp.genFull, pset, 0, 3)
-        cur_ind, = gp.mutNodeReplacement(cur_ind, pset)
-        cur_ind, = gp.mutEphemeral(cur_ind, mode='one')
-        cur_ind, = gp.mutInsert(cur_ind, pset)
+        (cur_ind,) = mutUniform(cur_ind, gp.genFull, pset, 0, 3)
+        (cur_ind,) = gp.mutNodeReplacement(cur_ind, pset)
+        (cur_ind,) = gp.mutEphemeral(cur_ind, mode='one')
+        (cur_ind,) = gp.mutInsert(cur_ind, pset)
 
         if check_individual(cur_ind, pset, min_height, max_height):
             return cur_ind
@@ -130,18 +145,51 @@ def sample_individual(expr, pset, min_height, max_height, is_stage2):
 
 
 # Sample entire individual for stage 1 and 2
-def sample_entire_individual(all_init_expr, pset, param_list, num_layers, min_height, max_height,
-                             min_params, max_params, is_stage2=False, max_sample=1000):
+def sample_entire_individual(
+    all_init_expr,
+    pset,
+    param_list,
+    num_layers,
+    min_height,
+    max_height,
+    min_params,
+    max_params,
+    is_stage2=False,
+    max_sample=1000,
+):
     def _gen_entire_ind():
         if is_stage2:
             all_cand_expr = [expr.split(', ') for expr in all_init_expr]
-            new_cand_expr = np.array([[re.sub(r'linear(\d+)_(\d+)', r'linear', str(expr)) for expr in cand_expr]
-                                      for cand_expr in all_cand_expr])
-            return [sample_individual(random.choice(new_cand_expr[:, i]), pset, min_height, max_height, is_stage2)
-                    for i in range(num_layers)]
+            new_cand_expr = np.array(
+                [
+                    [
+                        re.sub(r'linear(\d+)_(\d+)', r'linear', str(expr))
+                        for expr in cand_expr
+                    ]
+                    for cand_expr in all_cand_expr
+                ]
+            )
+            return [
+                sample_individual(
+                    random.choice(new_cand_expr[:, i]),
+                    pset,
+                    min_height,
+                    max_height,
+                    is_stage2,
+                )
+                for i in range(num_layers)
+            ]
         else:
-            return [sample_individual(random.choice(all_init_expr), pset, min_height, max_height, is_stage2)
-                    for _ in range(num_layers)]
+            return [
+                sample_individual(
+                    random.choice(all_init_expr),
+                    pset,
+                    min_height,
+                    max_height,
+                    is_stage2,
+                )
+                for _ in range(num_layers)
+            ]
 
     entire_ind = _gen_entire_ind()
     if is_stage2:
@@ -158,10 +206,22 @@ def sample_entire_individual(all_init_expr, pset, param_list, num_layers, min_he
 
 
 # Sample entire individual for stage 3
-def sample_entire_individual2(all_init_expr, pset, param_list, num_layers, min_params, max_params, max_sample=10000):
+def sample_entire_individual2(
+    all_init_expr,
+    pset,
+    param_list,
+    num_layers,
+    min_params,
+    max_params,
+    max_sample=10000,
+):
     def _gen_entire_ind():
         all_cand_expr = np.array([expr.split(', ') for expr in all_init_expr])
-        entire_ind = [gp.PrimitiveTree.from_string(random.choice(all_cand_expr[:, i]), pset) for i in range(num_layers)]
+        entire_ind = [
+            gp.PrimitiveTree.from_string(
+                random.choice(all_cand_expr[:, i]), pset)
+            for i in range(num_layers)
+        ]
         return entire_ind
 
     entire_ind = _gen_entire_ind()
@@ -176,24 +236,47 @@ def sample_entire_individual2(all_init_expr, pset, param_list, num_layers, min_p
 
 
 # Sample individual ids for stage 1 and 2
-def sample_individual_ids(all_init_expr, pset, param_list, num_layers, min_height, max_height, min_params, max_params,
-                          max_pad_len=20, is_init=False, is_stage2=False):
+def sample_individual_ids(
+    all_init_expr,
+    pset,
+    param_list,
+    num_layers,
+    min_height,
+    max_height,
+    min_params,
+    max_params,
+    max_pad_len=20,
+    is_init=False,
+    is_stage2=False,
+):
     inp_args = pset.arguments
-    inp_arg_name_map = {k: v for k, v in zip(inp_args, ['ARG' + str(i) for i in range(len(inp_args))])}
-    all_args = [inp_arg_name_map[k] if k in inp_args else k for k in pset.mapping.keys()]
+    inp_arg_name_map = {
+        k: v for k, v in zip(inp_args, ['ARG' + str(i) for i in range(len(inp_args))])
+    }
+    all_args = [
+        inp_arg_name_map[k] if k in inp_args else k for k in pset.mapping.keys()
+    ]
     all_arg_id_map = {k: v for v, k in enumerate(all_args)}
 
     if is_init:
         all_individuals = []
         if is_stage2:
             for i, expr in enumerate(all_init_expr):
-                entire_ind = [gp.PrimitiveTree.from_string(re.sub(r'linear(\d+)_(\d+)', r'linear', str(expr_)), pset)
-                              for expr_ in expr.split(', ')]
+                entire_ind = [
+                    gp.PrimitiveTree.from_string(
+                        re.sub(r'linear(\d+)_(\d+)',
+                               r'linear', str(expr_)), pset
+                    )
+                    for expr_ in expr.split(', ')
+                ]
                 all_individuals.append(entire_ind)
         else:
             for i, expr in enumerate(all_init_expr):
                 if i == 0:
-                    entire_ind = [gp.PrimitiveTree.from_string(expr, pset) for _ in range(num_layers)]
+                    entire_ind = [
+                        gp.PrimitiveTree.from_string(expr, pset)
+                        for _ in range(num_layers)
+                    ]
                     all_individuals.append(entire_ind)
 
         all_ind_ids = []
@@ -207,7 +290,16 @@ def sample_individual_ids(all_init_expr, pset, param_list, num_layers, min_heigh
         return all_ind_ids, all_individuals
     else:
         entire_ind = sample_entire_individual(
-            all_init_expr, pset, param_list, num_layers, min_height, max_height, min_params, max_params, is_stage2)
+            all_init_expr,
+            pset,
+            param_list,
+            num_layers,
+            min_height,
+            max_height,
+            min_params,
+            max_params,
+            is_stage2,
+        )
         entire_ind_ids = []
         for layer_ind in entire_ind:
             cur_ind_ids = [all_arg_id_map[arg.name] for arg in layer_ind]
@@ -217,33 +309,45 @@ def sample_individual_ids(all_init_expr, pset, param_list, num_layers, min_heigh
 
 
 # Sample individual ids for stage 3
-def sample_individual_ids2(all_init_expr, pset, param_list, num_layers, min_params, max_params, is_init=False):
+def sample_individual_ids2(
+    all_init_expr, pset, param_list, num_layers, min_params, max_params, is_init=False
+):
     linear_id_map = {k: v for v, k in enumerate(pset.all_linear_ids)}
 
     if is_init:
         all_individuals = []
         for i, expr in enumerate(all_init_expr):
             if i == 0:
-                entire_ind = [gp.PrimitiveTree.from_string(expr_, pset) for expr_ in expr.split(', ')]
+                entire_ind = [
+                    gp.PrimitiveTree.from_string(expr_, pset)
+                    for expr_ in expr.split(', ')
+                ]
                 all_individuals.append(entire_ind)
 
         all_ind_ids = []
         for entire_ind in all_individuals:
             entire_linear_idx = get_entire_linear_idx(entire_ind)
-            entire_ind_ids = [linear_id_map[linear_id] for linear_id in entire_linear_idx]
+            entire_ind_ids = [
+                linear_id_map[linear_id] for linear_id in entire_linear_idx
+            ]
             all_ind_ids.append(entire_ind_ids)
         return all_ind_ids, all_individuals
     else:
-        entire_ind = sample_entire_individual2(all_init_expr, pset, param_list, num_layers, min_params, max_params)
+        entire_ind = sample_entire_individual2(
+            all_init_expr, pset, param_list, num_layers, min_params, max_params
+        )
         entire_linear_idx = get_entire_linear_idx(entire_ind)
-        entire_ind_ids = [linear_id_map[linear_id] for linear_id in entire_linear_idx]
+        entire_ind_ids = [linear_id_map[linear_id]
+                          for linear_id in entire_linear_idx]
         return entire_ind_ids, entire_ind
 
 
 def train_classifier(x, y):
     x = pd.DataFrame(x)
     y = pd.DataFrame(y)
-    x_train, x_val, y_train, y_val = train_test_split(x, y, test_size=0.2, random_state=1)
+    x_train, x_val, y_train, y_val = train_test_split(
+        x, y, test_size=0.2, random_state=1
+    )
     train_data = lgb.Dataset(x_train, label=y_train)
     valid_data = lgb.Dataset(x_val, label=y_val)
 
@@ -268,23 +372,60 @@ def train_classifier(x, y):
     }
 
     def objective(hyperparams):
-        model = lgb.train({**params, **hyperparams}, train_data, 100, valid_data, early_stopping_rounds=100, verbose_eval=0)
+        model = lgb.train(
+            {**params, **hyperparams},
+            train_data,
+            100,
+            valid_data,
+            early_stopping_rounds=100,
+            verbose_eval=0,
+        )
         score = model.best_score['valid_0'][params['metric']]
         return {'loss': score, 'status': STATUS_OK}
 
     trials = Trials()
     with open(os.devnull, 'w+') as file, redirect_stdout(file):
         tpe.logger.setLevel(logging.ERROR)
-        best = fmin(fn=objective, space=space, trials=trials, algo=tpe.suggest, max_evals=10, verbose=False, rstate=np.random.RandomState(1))
+        best = fmin(
+            fn=objective,
+            space=space,
+            trials=trials,
+            algo=tpe.suggest,
+            max_evals=10,
+            verbose=False,
+            rstate=np.random.RandomState(1),
+        )
         hyperparams = space_eval(space, best)
-        model = lgb.train({**params, **hyperparams}, train_data, 100, valid_data, early_stopping_rounds=100, verbose_eval=0)
+        model = lgb.train(
+            {**params, **hyperparams},
+            train_data,
+            100,
+            valid_data,
+            early_stopping_rounds=100,
+            verbose_eval=0,
+        )
     return model
 
 
 class SearchPhase(object):
-    def __init__(self, all_init_expr, pset, param_list, num_layers, min_expr_height, max_expr_height,
-                 min_params, max_params, fixed_mat_dir, n_init_samples, train_interval, n_total_samples,
-                 is_stage2=False, is_stage3=False, height_level=(400, 800, 1600, 3200)):
+    def __init__(
+        self,
+        all_init_expr,
+        pset,
+        param_list,
+        num_layers,
+        min_expr_height,
+        max_expr_height,
+        min_params,
+        max_params,
+        fixed_mat_dir,
+        n_init_samples,
+        train_interval,
+        n_total_samples,
+        is_stage2=False,
+        is_stage3=False,
+        height_level=(400, 800, 1600, 3200),
+    ):
         self.all_init_expr = all_init_expr
         self.pset = pset
         self.param_list = param_list
@@ -310,15 +451,32 @@ class SearchPhase(object):
     def sample_individual_ids(self, is_init=False):
         if self.is_stage3:
             return sample_individual_ids2(
-                self.all_init_expr, self.pset, self.param_list, self.num_layers, self.min_params, self.max_params,
-                is_init=is_init)
+                self.all_init_expr,
+                self.pset,
+                self.param_list,
+                self.num_layers,
+                self.min_params,
+                self.max_params,
+                is_init=is_init,
+            )
         else:
             return sample_individual_ids(
-                self.all_init_expr, self.pset, self.param_list, self.num_layers, self.min_expr_height,
-                self.max_expr_height, self.min_params, self.max_params, is_init=is_init, is_stage2=self.is_stage2)
+                self.all_init_expr,
+                self.pset,
+                self.param_list,
+                self.num_layers,
+                self.min_expr_height,
+                self.max_expr_height,
+                self.min_params,
+                self.max_params,
+                is_init=is_init,
+                is_stage2=self.is_stage2,
+            )
 
     def get_hash_key_acc(self, entire_ind, hash_dict=None):
-        return get_hash_key_acc(entire_ind, self.pset, self.fixed_mat_dir, hash_dict, self.is_stage2)
+        return get_hash_key_acc(
+            entire_ind, self.pset, self.fixed_mat_dir, hash_dict, self.is_stage2
+        )
 
     def entire_ind_to_string(self, entire_ind):
         return ', '.join([str(ind).replace(' ', '') for ind in entire_ind])
@@ -335,7 +493,8 @@ class SearchPhase(object):
 
     def sampler(self):
         while len(self.y) < self.n_init_yield:
-            init_ind_ids, init_individuals = self.sample_individual_ids(is_init=True)
+            init_ind_ids, init_individuals = self.sample_individual_ids(
+                is_init=True)
             self.n_init_yield = len(init_individuals)
             yield init_ind_ids[len(self.y)], init_individuals[len(self.y)]
 
@@ -349,7 +508,9 @@ class SearchPhase(object):
         while True:
             cur_select = 0
             while cur_select < self.train_interval:
-                cur_x, cur_ind = self.classifier.sample(self.sample_individual_ids, self.is_unique)
+                cur_x, cur_ind = self.classifier.sample(
+                    self.sample_individual_ids, self.is_unique
+                )
                 cur_select += 1
                 yield cur_x, cur_ind
             self.classifier = LearningPhase(self.x, self.y, self.height())
@@ -371,34 +532,52 @@ class SearchPhase(object):
             ind_str = self.entire_ind_to_string(cur_ind)
             logging.info('ind_str: {}'.format(ind_str))
             if self.is_stage2:
-                params = get_entire_params(self.param_list, self.all_init_expr[0].split(', '))
+                params = get_entire_params(
+                    self.param_list, self.all_init_expr[0].split(', ')
+                )
             else:
                 params = get_entire_params(self.param_list, cur_ind)
 
             if self.is_unique(cur_ind, add_to_set=True):
                 if local_rank == 0:
-                    logging.info('Params: {:.2f}M  Expr: {}'.format(params, ind_str))
+                    logging.info(
+                        'Params: {:.2f}M  Expr: {}'.format(params, ind_str))
                 if self.is_stage2:
-                    entire_ffn_func = [gp.compile(re.sub(r'linear(\d+)_(\d+)', r'linear', str(ind)), self.pset)
-                                       for ind in cur_ind]
-                    entire_linear_idx = get_entire_linear_idx(self.all_init_expr[0].split(', '))
+                    entire_ffn_func = [
+                        gp.compile(
+                            re.sub(r'linear(\d+)_(\d+)',
+                                   r'linear', str(ind)), self.pset
+                        )
+                        for ind in cur_ind
+                    ]
+                    entire_linear_idx = get_entire_linear_idx(
+                        self.all_init_expr[0].split(', ')
+                    )
                 else:
-                    entire_ffn_func = [gp.compile(ind, self.pset) for ind in cur_ind]
+                    entire_ffn_func = [gp.compile(
+                        ind, self.pset) for ind in cur_ind]
                     entire_linear_idx = get_entire_linear_idx(cur_ind)
 
                 if self.is_stage3:
                     # Model and data loader is set to None here to use the default settings
                     # (student_model and downstream_dev_loader respectively)
-                    acc = val_function([entire_ffn_func, entire_linear_idx], is_search=True)
+                    acc = val_function(
+                        [entire_ffn_func, entire_linear_idx], is_search=True
+                    )
                     pass
                 else:
-                    acc = train_val_function(entire_ffn_func, entire_linear_idx)
+                    acc = train_val_function(
+                        entire_ffn_func, entire_linear_idx)
                     pass
                 self.back_propagate(ind_str, cur_x, acc)
 
                 if local_rank == 0:
                     logging.info('-' * 50)
-                    logging.info('Pop idx: {}  Params: {:.2f}M  Acc: {}  Expr: {}'.format(pop_idx, params, acc, ind_str))
+                    logging.info(
+                        'Pop idx: {}  Params: {:.2f}M  Acc: {}  Expr: {}'.format(
+                            pop_idx, params, acc, ind_str
+                        )
+                    )
                     logging.info('-' * 50)
             else:
                 if local_rank == 0:
@@ -415,16 +594,28 @@ class SearchPhase(object):
                     num_disp = min(len(self.individuals), max_disp)
                     logging.info('-' * 50)
                     logging.info('Top {} individuals'.format(max_disp))
-                    for i, (ind_str, acc) in enumerate(zip(sorted_ind[:num_disp], sorted_acc[:num_disp])):
+                    for i, (ind_str, acc) in enumerate(
+                        zip(sorted_ind[:num_disp], sorted_acc[:num_disp])
+                    ):
                         if self.is_stage2:
-                            cur_params = get_entire_params(self.param_list, self.all_init_expr[0].split(', '))
+                            cur_params = get_entire_params(
+                                self.param_list, self.all_init_expr[0].split(
+                                    ', ')
+                            )
                         else:
-                            cur_params = get_entire_params(self.param_list, ind_str.split(', '))
-                        logging.info('[{}/{}]  Params: {:.2f}M  Acc: {}  Expr: {}'.format(i + 1, num_disp, cur_params, acc, ind_str))
+                            cur_params = get_entire_params(
+                                self.param_list, ind_str.split(', ')
+                            )
+                        logging.info(
+                            '[{}/{}]  Params: {:.2f}M  Acc: {}  Expr: {}'.format(
+                                i + 1, num_disp, cur_params, acc, ind_str
+                            )
+                        )
                     logging.info('-' * 50)
 
                     save_path = os.path.join(save_dir, 'hall_of_fame.bin')
-                    hall_of_fame = {'individual': sorted_ind, 'accuracy': sorted_acc}
+                    hall_of_fame = {'individual': sorted_ind,
+                                    'accuracy': sorted_acc}
                     torch.save(hall_of_fame, save_path)
 
 
@@ -439,12 +630,22 @@ class LearningPhase(object):
         if self.height > 0:
             self.model = train_classifier(self.x, self.y >= self.value)
             build_trial = 0
-            while self.model.best_score['valid_0']['binary_error'] >= 0.5 + max(0, (build_trial - 100.0) / 1000.0 * 0.3):
+            while self.model.best_score['valid_0']['binary_error'] >= 0.5 + max(
+                0, (build_trial - 100.0) / 1000.0 * 0.3
+            ):
                 build_trial += 1
                 self.model = train_classifier(self.x, self.y >= self.value)
 
-            self.left = LearningPhase(self.x[self.y >= self.value], self.y[self.y >= self.value], self.height - 1)
-            self.right = LearningPhase(self.x[self.y < self.value], self.y[self.y < self.value], self.height - 1)
+            self.left = LearningPhase(
+                self.x[self.y >= self.value],
+                self.y[self.y >= self.value],
+                self.height - 1,
+            )
+            self.right = LearningPhase(
+                self.x[self.y < self.value],
+                self.y[self.y < self.value],
+                self.height - 1,
+            )
             self.threshold = self.right.value
 
     def sample(self, sample_function, check_unique_function, max_sample=20000):

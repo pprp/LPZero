@@ -1,7 +1,6 @@
 import argparse
 import csv
 import json
-
 import logging
 import math
 import random
@@ -20,16 +19,15 @@ from lpzero.model.flexibert.modeling_electra import (
     ElectraLayer,
     ElectraModel,
 )
+from lpzero.runner.evo_search import all_same, generate_inputs, is_anomaly, parse_args
 from lpzero.structures import GraphStructure, LinearStructure, TreeStructure
 from lpzero.utils.rank_consistency import spearman
-from lpzero.runner.evo_search import parse_args, all_same, generate_inputs, is_anomaly
 
 configs = []
 with open('./data/BERT_benchmark.json', 'r') as f:
     configs = json.load(f)
 
 args = parse_args()
-
 
 
 def fitness_spearman(inputs, structure, device=None, num_sample=50):
@@ -109,16 +107,12 @@ if __name__ == '__main__':
 
     print('Begin Evolution Search...')
     struct = structure()
-    genotype = {
-        'input_geno': ['head', 'act'],
-        'op_geno': [[18, 3], [5, 12], 2]
-    }
+    genotype = {'input_geno': ['head', 'act'],
+                'op_geno': [[18, 3], [5, 12], 2]}
     struct.genotype = genotype
     # Struct=INPUT:(head, act)
     # TREE:(to_std_scalar-element_wise_pow|normalize-sigmoid)
     # BINARY:(element_wise_product) Input=['head', 'act'] Op=[[18, 3], [5, 12], 2]
-    
+
     sp = fitness_spearman(inputs, struct, num_sample=args.num_sample)
-    print(f"Spearman of {struct} is {sp}")
-    
-    
+    print(f'Spearman of {struct} is {sp}')

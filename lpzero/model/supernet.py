@@ -1,6 +1,7 @@
 import datasets
-import lpzero.model as models
 import torch.nn as nn
+
+import lpzero.model as models
 from lpzero.model.delight_transformer_layer import DeLighTTransformerEncoderLayer
 
 

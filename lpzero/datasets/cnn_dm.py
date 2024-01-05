@@ -2,10 +2,11 @@ import hashlib
 import logging
 import os
 
-import lpzero.model as models
 import torch
 from torch.utils.data.dataset import TensorDataset
 from tqdm import tqdm
+
+import lpzero.model as models
 
 DM_SINGLE_CLOSE_QUOTE = '\u2019'  # unicode
 DM_DOUBLE_CLOSE_QUOTE = '\u201d'

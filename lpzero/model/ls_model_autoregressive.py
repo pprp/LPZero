@@ -6,13 +6,13 @@
 
 import math
 
-import lpzero.model as models
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
 from fairseq.modules.gelu import gelu
 from fairseq.modules.layer_norm import LayerNorm
 
+import lpzero.model as models
 from .ls_layer import ChunkedLSAttention
 
 

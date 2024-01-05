@@ -2,13 +2,13 @@ import logging
 import math
 
 import datasets
-import lpzero.model as models
 import numpy as np
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
 from sklearn.decomposition import PCA
 
+import lpzero.model as models
 from .cka import CKA_Minibatch_Grid
 from .dynamic_ops import DynamicLinear
 from .pca_torch import pca_torch

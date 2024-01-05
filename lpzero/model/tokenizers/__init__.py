@@ -1,5 +1,4 @@
 import lpzero.model as models
-
 from .base_tokenizer import BaseTokenizer, EncodedInput
 from .bert_tokenizer import BertBasicTokenizer, BertTokenizer
 from .gpt2_tokenizer import Gpt2BasicTokenizer, Gpt2Tokenizer

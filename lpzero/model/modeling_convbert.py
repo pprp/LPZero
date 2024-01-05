@@ -6,7 +6,6 @@
 """
 """PyTorch ConvBert model. """
 
-
 # Copied from transformers.models.bert.modeling_bert.BertSelfAttention with Bert->Electra
 
 

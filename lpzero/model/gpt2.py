@@ -1,8 +1,9 @@
 import math
 
-import lpzero.model as models
 import torch
 import torch.nn as nn
+
+import lpzero.model as models
 
 
 class Conv1D(nn.Module):

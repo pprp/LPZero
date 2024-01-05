@@ -1,11 +1,12 @@
-import sys
 import logging
 import os
+import random
+import sys
+
+import numpy as np
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
-import random
-import numpy as np
 from thop import profile
 
 
@@ -29,7 +30,9 @@ class AverageMeter(object):
 def setup_logger(log_dir):
     os.makedirs(log_dir, exist_ok=True)
     log_format = '[%(asctime)s] %(message)s'
-    logging.basicConfig(stream=sys.stdout, level=logging.INFO, format=log_format, datefmt='%d %I:%M:%S')
+    logging.basicConfig(
+        stream=sys.stdout, level=logging.INFO, format=log_format, datefmt='%d %I:%M:%S'
+    )
     fh = logging.FileHandler(os.path.join(log_dir, 'log.txt'))
     fh.setFormatter(logging.Formatter(log_format))
     logging.getLogger().addHandler(fh)
@@ -48,7 +51,7 @@ def set_seeds(seed, use_gpu=False):
 
 def count_flops_params(model, inputs):
     if not isinstance(inputs, tuple):
-        inputs = (inputs, )
+        inputs = (inputs,)
     flops, params = profile(model, inputs=inputs, verbose=False)
     return flops, params
 

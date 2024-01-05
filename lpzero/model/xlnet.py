@@ -1,8 +1,9 @@
 import datasets
-import lpzero.model as models
 import torch
 import torch.nn as nn
 from torch.nn import functional as F
+
+import lpzero.model as models
 
 
 class XlnetAttention(nn.Module):

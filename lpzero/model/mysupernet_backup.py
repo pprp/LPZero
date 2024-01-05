@@ -1,10 +1,10 @@
 import datasets
-import lpzero.model as models
 import numpy as np
 import torch.nn as nn
 from sklearn.decomposition import PCA
-from lpzero.utils import calc_params
 
+import lpzero.model as models
+from lpzero.utils import calc_params
 from .mobile_bert import MobileBertTransformerBlockForSupernet
 from .pca_torch import pca_torch
 from .transformer_multibranch_v2 import (

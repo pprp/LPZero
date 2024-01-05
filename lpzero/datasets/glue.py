@@ -3,10 +3,11 @@ import logging
 import os
 
 import datasets
-import lpzero.model as models
 import torch
 from torch.utils.data.dataset import TensorDataset
 from tqdm import tqdm
+
+import lpzero.model as models
 
 
 class GlueExample(object):
