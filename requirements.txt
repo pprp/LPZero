@@ -8,3 +8,8 @@ seaborn
 tensorflow>=2.9.1
 torch>=1.12
 transformers
+lightgbm
+deap
+hyperopt
+thop
+fairseq

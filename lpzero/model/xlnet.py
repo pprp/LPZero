@@ -1,5 +1,5 @@
 import datasets
-import models
+import lpzero.model as models
 import torch
 import torch.nn as nn
 from torch.nn import functional as F

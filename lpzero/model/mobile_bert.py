@@ -2,7 +2,7 @@ import logging
 import math
 
 import datasets
-import models
+import lpzero.model as models
 import numpy as np
 import torch
 import torch.nn as nn

@@ -1,9 +1,6 @@
 import argparse
 import csv
 import json
-
-# build logger
-import logging
 import math
 import random
 from typing import Union

@@ -3,7 +3,7 @@ import math
 import re
 import string
 
-import models
+import lpzero.model as models
 
 
 def normalize_answer(s):

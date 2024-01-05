@@ -2,7 +2,7 @@ import hashlib
 import logging
 import os
 
-import models
+import lpzero.model as models
 import torch
 from torch.utils.data.dataset import TensorDataset
 from tqdm import tqdm

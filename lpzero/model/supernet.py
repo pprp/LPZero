@@ -1,7 +1,7 @@
 import datasets
-import models
+import lpzero.model as models
 import torch.nn as nn
-from models.delight_transformer_layer import DeLighTTransformerEncoderLayer
+from lpzero.model.delight_transformer_layer import DeLighTTransformerEncoderLayer
 
 
 class SupernetFeedForwardNetwork(nn.Module):

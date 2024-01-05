@@ -2,7 +2,7 @@ import json
 import logging
 import os
 
-import models
+import lpzero.model as models
 import numpy as np
 import torch
 from torch.utils.data.dataset import TensorDataset

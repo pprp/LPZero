@@ -1,20 +1,20 @@
 import logging
 
 import datasets
-import models
+import lpzero.model as models
 import numpy as np
 import torch.nn as nn
 from torch.nn import functional as F
-from utils import calc_params
+from lpzero.utils import calc_params
 
 from .dynamic_ops import DynamicLinear
 from .ls_model import TransformerLSLayer
 from .mobile_bert import MobileBertTransformerBlockForSupernet
 from .modeling_convbert import ConvBertLayer
 from .pca_torch import pca_torch
-from .transformer_multibranch_v2 import (
-    TransformerEncoderLayer as MultiBranchBlockForSupernet,
-)
+# from .transformer_multibranch_v2 import (
+#     TransformerEncoderLayer as MultiBranchBlockForSupernet,
+# ) # TODO fairseq 
 
 
 class MySupernetFeedForwardNetwork(nn.Module):

@@ -6,7 +6,7 @@
 
 import math
 
-import models
+import lpzero.model as models
 import torch
 import torch.nn as nn
 import torch.nn.functional as F

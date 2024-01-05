@@ -49,7 +49,7 @@ from .gpt2 import Gpt2
 from .mobile_bert import MobileBert, MobileBertEmbedding, MobileBertSingle
 from .mysupernet import MultiTaskMySupernet, MySupernet, MySupernetSingle
 from .roberta import Roberta, RobertaSingle
-from .supernet import Supernet, SupernetSingle
+# from .supernet import Supernet, SupernetSingle
 from .tiny_bert import TinyBert, TinyBertSingle
 from .xlnet import Xlnet, XlnetSingle
 
