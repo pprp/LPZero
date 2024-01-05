@@ -16,7 +16,7 @@ class BaseStructure(metaclass=ABCMeta):
     def genotype(self, _genotype):
         self._genotype = _genotype
 
-    def __repr__(self) -> str:
+    def __str__(self):
         return self._repr_geno
 
     @property

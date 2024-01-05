@@ -1,17 +1,10 @@
-import argparse
-import csv
 import json
-import logging
-import math
-import random
-from typing import Union
 
 import matplotlib.pyplot as plt
 import numpy as np
 import torch
 from datasets import load_dataset
-from loguru import logger
-from torch import Tensor
+from tqdm import tqdm
 from transformers import ElectraTokenizerFast
 
 from lpzero.model.flexibert.modeling_electra import (
@@ -40,7 +33,7 @@ def fitness_spearman(inputs, structure, device=None, num_sample=50):
     gt_score = []
     zc_score = []
 
-    for i in range(num_sample):
+    for i in tqdm(range(num_sample)):
         nas_config = configs[i]['hparams']['model_hparam_overrides']['nas_config']
 
         gt = configs[i]['scores']['glue']
@@ -88,6 +81,17 @@ def fitness_spearman(inputs, structure, device=None, num_sample=50):
     sp = spearman(gt_score, zc_score)
     if structure.sp_score == -1:
         structure.sp_score = sp
+
+    # plot the result
+    plt.figure()
+    # min-max normalization for zc_score
+    zc_score = (zc_score - np.min(zc_score)) / \
+        (np.max(zc_score) - np.min(zc_score))
+    plt.scatter(gt_score, zc_score, marker='o', color='red')
+    plt.xlabel('Ground Truth')
+    plt.ylabel('Zero Cost (LPZero)')
+    plt.title(f'Spearman Correlation: {sp}')
+    plt.savefig(f'./output/{structure}.png')
     return sp
 
 
@@ -114,5 +118,5 @@ if __name__ == '__main__':
     # TREE:(to_std_scalar-element_wise_pow|normalize-sigmoid)
     # BINARY:(element_wise_product) Input=['head', 'act'] Op=[[18, 3], [5, 12], 2]
 
-    sp = fitness_spearman(inputs, struct, num_sample=args.num_sample)
+    sp = fitness_spearman(inputs, struct, num_sample=200)
     print(f'Spearman of {struct} is {sp}')

@@ -40,6 +40,18 @@ class TreeStructure(BaseStructure):
         idx_zc = random.choice(range(total_num_zc_candidates))
         return available_zc_candidates[idx_zc]
 
+    def __str__(self):
+        # regenerate string _repr_geno based on _genotype
+        _repr_geno = ''
+        _repr_geno += f'INPUT:({self._genotype["input_geno"][0]}, {self._genotype["input_geno"][1]})'
+        # for input1
+        _repr_geno += f'TREE:({UNARY_KEYS[self._genotype["op_geno"][0][0]]}|{UNARY_KEYS[self._genotype["op_geno"][0][1]]}|'
+        # for input2
+        _repr_geno += f'{UNARY_KEYS[self._genotype["op_geno"][1][0]]}|{UNARY_KEYS[self._genotype["op_geno"][1][1]]})'
+        # for binary operation
+        _repr_geno += f'BINARY:({BINARY_KEYS[self._genotype["op_geno"][2]]})'
+        return _repr_geno
+
     def generate_genotype(self):
         """Randomly generate a tree structure.
 
