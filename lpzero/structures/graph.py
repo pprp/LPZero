@@ -37,6 +37,16 @@ class GraphStructure(BaseStructure):
         total_num_zc_candidates = len(available_zc_candidates)
         idx_zc = random.choice(range(total_num_zc_candidates))
         return available_zc_candidates[idx_zc]
+    
+    def __str__(self):
+        _repr_geno = ''
+        _repr_geno += f'INPUT:({self._genotype["input_geno"][0]}, {self._genotype["input_geno"][1]})UNARY:('
+        for i in range(self.n_nodes):
+            for j in range(i + 2):
+                _repr_geno += UNARY_KEYS[self._genotype["op_geno"][i][j]] + '|'
+            _repr_geno += '-> '
+        _repr_geno += ')'
+        return _repr_geno
 
     def generate_genotype(self):
         """Randomly generate a graph structure."""
@@ -61,31 +71,19 @@ class GraphStructure(BaseStructure):
         self._repr_geno = repr_geno
 
     def forward_dag(self, inputs, model):
-        if torch.cuda.is_available():
-            img = img.cuda()
-            label = label.cuda()
-        # preprocess inputs to states
-        try:
-            states = [
-                get_zc_candidates(
-                    zc_name,
-                    model,
-                    device=torch.device(
-                        'cuda' if torch.cuda.is_available() else 'cpu'),
-                    inputs=img,
-                    targets=label,
-                    loss_fn=nn.CrossEntropyLoss(),
-                )
-                for zc_name in self._genotype['input_geno']
-            ]
-
-            assert len(states) == 2, 'length of states should be 2'
-
-        except Exception as e:
-            print('GOT ERROR in GRAPH STRUCTURE: ', e)
-            return -1  # invalid
-
-        try:
+        """forward DAG and return ZC score"""
+        
+        states = []
+        for zc_name in self._genotype['input_geno']:
+            states.append(get_zc_candidates(zc_name, 
+                          model=model, 
+                          device=torch.device(
+                              'cuda' if torch.cuda.is_available() else 'cpu'),
+                          inputs=inputs,
+                          loss_fn=nn.CrossEntropyLoss()))
+        breakpoint()
+        # try:
+        if True:
             for edges in self._genotype['op_geno']:
                 assert len(states) == len(
                     edges
@@ -113,9 +111,9 @@ class GraphStructure(BaseStructure):
                 if math.isnan(res) or math.isinf(res):
                     return -1  # invalid
                 res_list.append(res)
-        except Exception as e:
-            print('GOT ERROR in GRAPH STRUCTURE: ', e)
-            return -1  # invalid
+        # except Exception as e:
+        #     print('GOT ERROR in GRAPH STRUCTURE: ', e)
+        #     return -1  # invalid
 
         # check whether the res_list of float have inf,nan
         return sum(res_list) / len(res_list)
