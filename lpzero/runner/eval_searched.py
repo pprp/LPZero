@@ -81,7 +81,7 @@ def fitness_spearman(inputs, structure, device=None, num_sample=50):
     sp = spearman(gt_score, zc_score)
     if structure.sp_score == -1:
         structure.sp_score = sp
-
+    
     # plot the result
     plt.figure()
     # z-score for zc_score 
@@ -116,8 +116,16 @@ if __name__ == '__main__':
 
     print('Begin Evolution Search...')
     struct = structure()
-    genotype = {'input_geno': ['head', 'act'],
-                'op_geno': [[18, 3], [5, 12], 2]}
+    # genotype = {'input_geno': ['head', 'act'],
+    #             'op_geno': [[18, 3], [5, 12], 2]} # 0.7581
+    # genotype = {
+    #     'input_geno': ['jacobs', 'head'],
+    #     'op_geno': [[14, 8], [15, 10], 0],
+    # } # 0.7474
+    genotype = {
+        'input_geno': ['head', 'act'],
+        'op_geno': [[2, 17], [18, 13], 0],
+    }
     struct.genotype = genotype
     # Struct=INPUT:(head, act)
     # TREE:(to_std_scalar-element_wise_pow|normalize-sigmoid)

@@ -81,7 +81,6 @@ class GraphStructure(BaseStructure):
                               'cuda' if torch.cuda.is_available() else 'cpu'),
                           inputs=inputs,
                           loss_fn=nn.CrossEntropyLoss()))
-        breakpoint()
         # try:
         if True:
             for edges in self._genotype['op_geno']:
