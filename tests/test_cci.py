@@ -1,7 +1,10 @@
 import unittest
 from unittest import TestCase
-from lpzero.metrics.cluster_correlation_index import measure_cluster_corr_index
+
 import numpy as np
+
+from lpzero.metrics.cluster_correlation_index import measure_cluster_corr_index
+
 
 class TestCCITestCase(TestCase):
     def test_cci(self):
@@ -11,5 +14,6 @@ class TestCCITestCase(TestCase):
         cci = measure_cluster_corr_index(var1, var2, n_clusters)
         print(cci)
 
+
 if __name__ == '__main__':
-    unittest.main()        
+    unittest.main()

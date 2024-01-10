@@ -1,6 +1,9 @@
 import unittest
+
 import numpy as np
+
 from lpzero.metrics.mutual_info import measure_mutual_information
+
 
 class TestMeasureMutualInformation(unittest.TestCase):
     def test_mutual_information_independent_variables(self):
@@ -25,7 +28,10 @@ class TestMeasureMutualInformation(unittest.TestCase):
         var1 = np.random.rand(1000)
         var2 = var1 * 2 + 1  # Perfect linear relationship
         mi_score = measure_mutual_information(var1, var2)
-        self.assertGreater(mi_score, 0.1)  # Expecting a value greater than for independent variables
+        self.assertGreater(
+            mi_score, 0.1
+        )  # Expecting a value greater than for independent variables
+
 
 if __name__ == '__main__':
     unittest.main()

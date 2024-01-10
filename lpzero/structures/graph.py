@@ -37,13 +37,13 @@ class GraphStructure(BaseStructure):
         total_num_zc_candidates = len(available_zc_candidates)
         idx_zc = random.choice(range(total_num_zc_candidates))
         return available_zc_candidates[idx_zc]
-    
+
     def __str__(self):
         _repr_geno = ''
         _repr_geno += f'INPUT:({self._genotype["input_geno"][0]}, {self._genotype["input_geno"][1]})UNARY:('
         for i in range(self.n_nodes):
             for j in range(i + 2):
-                _repr_geno += UNARY_KEYS[self._genotype["op_geno"][i][j]] + '|'
+                _repr_geno += UNARY_KEYS[self._genotype['op_geno'][i][j]] + '|'
             _repr_geno += '-> '
         _repr_geno += ')'
         return _repr_geno
@@ -72,15 +72,19 @@ class GraphStructure(BaseStructure):
 
     def forward_dag(self, inputs, model):
         """forward DAG and return ZC score"""
-        
+
         states = []
         for zc_name in self._genotype['input_geno']:
-            states.append(get_zc_candidates(zc_name, 
-                          model=model, 
-                          device=torch.device(
-                              'cuda' if torch.cuda.is_available() else 'cpu'),
-                          inputs=inputs,
-                          loss_fn=nn.CrossEntropyLoss()))
+            states.append(
+                get_zc_candidates(
+                    zc_name,
+                    model=model,
+                    device=torch.device(
+                        'cuda' if torch.cuda.is_available() else 'cpu'),
+                    inputs=inputs,
+                    loss_fn=nn.CrossEntropyLoss(),
+                )
+            )
         # try:
         if True:
             for edges in self._genotype['op_geno']:

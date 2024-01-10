@@ -25,8 +25,9 @@ configs = []
 with open('./data/BERT_benchmark.json', 'r') as f:
     configs = json.load(f)
 
-# memory dict key:genotype value: {sp, mutual, silhouette} 
+# memory dict key:genotype value: {sp, mutual, silhouette}
 mem_dict = {}
+
 
 def parse_args():
     parser = argparse.ArgumentParser(
@@ -151,20 +152,21 @@ def ori_fitness_spearman(inputs, structure, device=None, num_sample=50):
     sp = spearman(gt_score, zc_score)
     if structure.sp_score == -1:
         structure.sp_score = sp
-    
+
     # top10
     # tp10_idx = np.argsort(zc_score)[::-1][:int(0.1 * len(gt_score))]
     # tp10_zc = [zc_score[i] for i in tp10_idx]
     # tp10_gt = [gt_score[i] for i in tp10_idx]
     # tp10_sp = spearman(tp10_gt, tp10_zc)
-    
+
     mem_dict[str(structure)] = {
         'sp': sp,
         'gt_list': gt_score,
         'zc_list': zc_score,
     }
-    
-    return sp 
+
+    return sp
+
 
 def dummy_fitness_spearman(inputs, structure, device=None, num_sample=50):
     gt_score = np.random.rand(num_sample)
@@ -175,9 +177,11 @@ def dummy_fitness_spearman(inputs, structure, device=None, num_sample=50):
         'gt_list': gt_score.tolist(),
         'zc_list': zc_score.tolist(),
     }
-    return sp 
+    return sp
+
 
 fitness_spearman = ori_fitness_spearman
+
 
 def is_anomaly(zc_score: Union[torch.Tensor, float, int] = None) -> bool:
     """filter the score with -1,0,nan,inf"""
@@ -333,8 +337,7 @@ if __name__ == '__main__':
 
     logger.info('Begin Evolution Search...')
     evolution_search(inputs, structure, args.iterations, args.popu_size)
-    
-    # save mem_dict to json 
+
+    # save mem_dict to json
     with open('mem_dict.json', 'w') as f:
         json.dump(mem_dict, f)
-        

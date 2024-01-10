@@ -81,15 +81,15 @@ def fitness_spearman(inputs, structure, device=None, num_sample=50):
     sp = spearman(gt_score, zc_score)
     if structure.sp_score == -1:
         structure.sp_score = sp
-    
+
     # plot the result
     plt.figure()
-    # z-score for zc_score 
+    # z-score for zc_score
     # zc_score = (zc_score - np.mean(zc_score)) / np.std(zc_score)
-    # min-max scale 
+    # min-max scale
     zc_score = (zc_score - np.min(zc_score)) / \
         (np.max(zc_score) - np.min(zc_score))
-    # filter pairs that zc_score is larger than 0.8 
+    # filter pairs that zc_score is larger than 0.8
     # gt_score = np.array(gt_score)[np.where(zc_score > 0.8)]
     # zc_score = np.array(zc_score)[np.where(zc_score > 0.8)]
     plt.scatter(gt_score, zc_score, marker='o', color='red')
