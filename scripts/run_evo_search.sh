@@ -31,16 +31,15 @@
 
 NUM_SAMPLE=50
 CUDA_VISIBLE_DEVICES=5 python lpzero/runner/evo_search.py \
-    --log_path ./logs/evo_search_cci_diversity_run0.log 
-    # \
-    # > logs/evo_search_cci_diversity_run0.log 2>&1 &
+    --log_path ./logs/evo_search_cci_diversity_run0.log \
+    > logs/evo_search_cci_diversity_run0.log 2>&1 &
 
-# NUM_SAMPLE=50
-# CUDA_VISIBLE_DEVICES=6 python lpzero/runner/evo_search.py \
-#     --log_path ./logs/evo_search_cci_diversity_run1.log \
-#     > logs/evo_search_cci_diversity_run1.log 2>&1 &
+NUM_SAMPLE=50
+CUDA_VISIBLE_DEVICES=6 python lpzero/runner/evo_search.py \
+    --log_path ./logs/evo_search_cci_diversity_run1.log \
+    > logs/evo_search_cci_diversity_run1.log 2>&1 &
 
-# NUM_SAMPLE=50
-# CUDA_VISIBLE_DEVICES=7 python lpzero/runner/evo_search.py \
-#     --log_path ./logs/evo_search_cci_diversity_run2.log \
-#     > logs/evo_search_cci_diversity_run2.log 2>&1 &
+NUM_SAMPLE=50
+CUDA_VISIBLE_DEVICES=7 python lpzero/runner/evo_search.py \
+    --log_path ./logs/evo_search_cci_diversity_run2.log \
+    > logs/evo_search_cci_diversity_run2.log 2>&1 &

@@ -4,7 +4,7 @@ import json
 import math
 import random
 from typing import Union
-
+import os 
 import matplotlib.pyplot as plt
 import numpy as np
 import torch
@@ -165,6 +165,7 @@ def ori_fitness_spearman(inputs, structure, device=None, num_sample=50):
 
 
 def dummy_fitness_spearman(inputs, structure, device=None, num_sample=50):
+    # Just for test acceleration
     gt_score = np.random.rand(num_sample)
     zc_score = np.random.rand(num_sample)
     sp = spearman(gt_score, zc_score)
@@ -176,7 +177,7 @@ def dummy_fitness_spearman(inputs, structure, device=None, num_sample=50):
     return sp
 
 
-fitness_spearman = dummy_fitness_spearman
+fitness_spearman = ori_fitness_spearman
 
 
 def compute_fitness(struct, cache, inputs):
@@ -285,19 +286,19 @@ def evolution_search(inputs, structure, iterations=1000, popu_size=50):
     )
 
     # plot the evolution process
-    save_name = f'evolution_{iterations}_{popu_size}_{random.randint(0, 1000)}'
+    save_name = f'evolution_{iterations}_{popu_size}_{os.path.basename(args.log_path)[:-4]}'
     plt.plot(idx, sps)
     plt.xlabel('Iteration')
     plt.ylabel('Spearman')
     plt.savefig(f'./output/{save_name}_with_diversity.png')
 
     # save idx and sps into csv file
-    with open(f'./output/{save_name}.csv', 'w') as f:
+    with open(f'./output/{save_name}_with_diversity.csv', 'w') as f:
         writer = csv.writer(f)
         writer.writerows(zip(idx, sps))
     
     # save cache to json
-    with open(f'./output/{save_name}_cache.json', 'w') as f:
+    with open(f'./output/{save_name}_with_diversity_cache.json', 'w') as f:
         json.dump(fitness_cache, f)
 
     return running_struct
