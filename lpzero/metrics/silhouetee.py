@@ -3,7 +3,7 @@ from sklearn.cluster import KMeans
 from sklearn.metrics import silhouette_score
 
 
-def measure_silhouette(var1, var2, n_clusters=3, random_state=42):
+def measure_silhouette(var1, var2, n_clusters=8, random_state=42):
     """
     Calculate the silhouette score for the clustering of two variables.
 
@@ -20,7 +20,7 @@ def measure_silhouette(var1, var2, n_clusters=3, random_state=42):
     X = np.column_stack((var1, var2))
 
     # Perform KMeans clustering
-    kmeans = KMeans(n_clusters=n_clusters, random_state=random_state)
+    kmeans = KMeans(n_clusters=n_clusters, random_state=random_state, n_init='auto')
     labels = kmeans.fit_predict(X)
 
     # Calculate the silhouette score
