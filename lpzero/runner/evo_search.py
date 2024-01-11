@@ -20,6 +20,7 @@ from lpzero.model.flexibert.modeling_electra import (
 )
 from lpzero.structures import GraphStructure, LinearStructure, TreeStructure
 from lpzero.utils.rank_consistency import spearman
+from lpzero.metrics.cluster_correlation_index import measure_cluster_corr_index
 
 configs = []
 with open('./data/BERT_benchmark.json', 'r') as f:
@@ -98,6 +99,7 @@ def ori_fitness_spearman(inputs, structure, device=None, num_sample=50):
     """structure is belong to popultion."""
     device = device or torch.device(
         'cuda' if torch.cuda.is_available() else 'cpu')
+
     if structure.sp_score != -1:
         return structure.sp_score
 
@@ -141,7 +143,6 @@ def ori_fitness_spearman(inputs, structure, device=None, num_sample=50):
             return -1
     except TypeError as e:
         import pdb
-
         pdb.set_trace()
 
     # release memory
@@ -153,19 +154,14 @@ def ori_fitness_spearman(inputs, structure, device=None, num_sample=50):
     if structure.sp_score == -1:
         structure.sp_score = sp
 
-    # top10
-    # tp10_idx = np.argsort(zc_score)[::-1][:int(0.1 * len(gt_score))]
-    # tp10_zc = [zc_score[i] for i in tp10_idx]
-    # tp10_gt = [gt_score[i] for i in tp10_idx]
-    # tp10_sp = spearman(tp10_gt, tp10_zc)
-
     mem_dict[str(structure)] = {
         'sp': sp,
         'gt_list': gt_score,
         'zc_list': zc_score,
     }
-
-    return sp
+    
+    cci = measure_cluster_corr_index(gt_score, zc_score, 1, 3)
+    return cci
 
 
 def dummy_fitness_spearman(inputs, structure, device=None, num_sample=50):
@@ -180,8 +176,13 @@ def dummy_fitness_spearman(inputs, structure, device=None, num_sample=50):
     return sp
 
 
-fitness_spearman = ori_fitness_spearman
+fitness_spearman = dummy_fitness_spearman
 
+
+def compute_fitness(struct, cache, inputs):
+    if struct.unique_id not in cache:
+        cache[struct.unique_id] = fitness_spearman(inputs, struct, num_sample=args.num_sample)
+    return cache[struct.unique_id]
 
 def is_anomaly(zc_score: Union[torch.Tensor, float, int] = None) -> bool:
     """filter the score with -1,0,nan,inf"""
@@ -202,11 +203,12 @@ def is_anomaly(zc_score: Union[torch.Tensor, float, int] = None) -> bool:
 def evolution_search(inputs, structure, iterations=1000, popu_size=50):
     # random initialize N structures for evolution
     population = []
+    fitness_cache = {}
     logger.info('Initialize population')
 
     while len(population) < popu_size:
         struct = structure()
-        score = fitness_spearman(inputs, struct, num_sample=args.num_sample)
+        score = compute_fitness(struct, fitness_cache, inputs)
         if is_anomaly(score):
             continue
         logger.info(f'Current population size: {len(population)}')
@@ -220,9 +222,10 @@ def evolution_search(inputs, structure, iterations=1000, popu_size=50):
     logger.info('Begin the evolution process...')
     for i in range(iterations):
         scores = [
-            fitness_spearman(inputs, struct, num_sample=args.num_sample)
+            compute_fitness(struct, fitness_cache, inputs)
             for struct in population
         ]
+        
         # select the best one from the population
         scores = np.array(scores)
         argidxs = np.argsort(scores)[::-1]
@@ -230,7 +233,7 @@ def evolution_search(inputs, structure, iterations=1000, popu_size=50):
         # best structure on the run
         running_struct = population[argidxs[0]]
         logger.info(
-            f'Iter: {i} Best SP: {scores[argidxs[0]]} Struct={running_struct} Input={running_struct.genotype["input_geno"]} Op={running_struct.genotype["op_geno"]}'
+            f'Iter: {i} Best CCI: {scores[argidxs[0]]} Struct={running_struct} Input={running_struct.genotype["input_geno"]} Op={running_struct.genotype["op_geno"]}'
         )
 
         # add data for matplotlib plot
@@ -252,32 +255,33 @@ def evolution_search(inputs, structure, iterations=1000, popu_size=50):
             offspring_struct = offspring_struct.mutate_by_genotype()
 
         # 3. Diversity-prompting selection
-        # offspring_zc = fitness_spearman(inputs,  offspring_struct, num_sample=args.num_sample)
-        # newbie = structure()
-        # newbie_zc = fitness_spearman(inputs,  newbie, num_sample=args.num_sample)
-
-        # 4. delete the deteriorated structure
-        del population[argidxs[-1]]
+        offspring_zc = compute_fitness(struct, fitness_cache, inputs)
+        newbie = structure()
+        newbie_zc = compute_fitness(struct, fitness_cache, inputs)
 
         # 5. add better offspring or newbie to population
-        # if offspring_zc > newbie_zc:
-        #     population.append(offspring_struct)
-        # else:
-        #     population.append(newbie)
-        population.append(offspring_struct)
+        if offspring_zc > newbie_zc:
+            population.append(offspring_struct)
+        else:
+            population.append(newbie)
+        
+        # 4. only keep top N structures
+        # Sort population based on their fitness
+        population = sorted(population, key=lambda x: compute_fitness(x, fitness_cache, inputs), reverse=True)
+        population = population[:popu_size]
 
         # 6. assert the population size should not shrink
         assert len(
-            population) == popu_size, f'Population size should be {popu_size}'
+            population) == popu_size, f'Population size should be {popu_size} but got {len(population)}'
 
     # evaluate the fitness of all structures
     scores = [
-        fitness_spearman(inputs, s, num_sample=args.num_sample) for s in population
+        compute_fitness(s, fitness_cache, inputs) for s in population
     ]
     argidxs = np.argsort(scores)[::-1]
     running_struct = population[argidxs[0]]
     logger.info(
-        f'After {iterations} iters: Best SP:{scores[argidxs[0]]} Struct={running_struct} Input={running_struct.genotype["input_geno"]} Op={running_struct.genotype["op_geno"]}'
+        f'After {iterations} iters: Best CCI:{scores[argidxs[0]]} Struct={running_struct} Input={running_struct.genotype["input_geno"]} Op={running_struct.genotype["op_geno"]}'
     )
 
     # plot the evolution process
@@ -285,12 +289,16 @@ def evolution_search(inputs, structure, iterations=1000, popu_size=50):
     plt.plot(idx, sps)
     plt.xlabel('Iteration')
     plt.ylabel('Spearman')
-    plt.savefig(f'./output/{save_name}.png')
+    plt.savefig(f'./output/{save_name}_with_diversity.png')
 
     # save idx and sps into csv file
     with open(f'./output/{save_name}.csv', 'w') as f:
         writer = csv.writer(f)
         writer.writerows(zip(idx, sps))
+    
+    # save cache to json
+    with open(f'./output/{save_name}_cache.json', 'w') as f:
+        json.dump(fitness_cache, f)
 
     return running_struct
 

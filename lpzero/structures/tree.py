@@ -52,6 +52,11 @@ class TreeStructure(BaseStructure):
         _repr_geno += f'BINARY:({BINARY_KEYS[self._genotype["op_geno"][2]]})'
         return _repr_geno
 
+    @property
+    def unique_id(self):
+        """Return unique id for this structure"""
+        return f'Struct={self} Input={self.genotype["input_geno"]} Op={self.genotype["op_geno"]}'
+
     def generate_genotype(self):
         """Randomly generate a tree structure.
 
