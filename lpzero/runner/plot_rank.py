@@ -17,7 +17,7 @@ def plot_correlations_from_csv(csv_file_path):
     df = pd.read_csv(csv_file_path)
     
     fig, axs = plt.subplots(2, 4)
-    fig.tight_layout(h_pad=4, w_pad=3)
+    fig.tight_layout(h_pad=3, w_pad=3)
 
     # Define the headers and corresponding column names in the DataFrame
     headers = [
@@ -57,19 +57,23 @@ def plot_correlations_from_csv(csv_file_path):
         tau, _ = kendalltau(gt_list, data_list)
         rho, _ = pearsonr(gt_list, data_list)
         
+        data_list = (data_list - min(data_list)) / (max(data_list) - min(data_list))
+        
         # Create the scatter plot directly with matplotlib to avoid conflicts
-        points = subplot.scatter(gt_list, data_list, c=data_list, cmap=cmap, s=10)
+        subplot.scatter(gt_list, data_list, c=data_list, cmap=cmap, s=15,
+                        edgecolor='black', linewidth=0.5)
         subplot.set_xlabel('GLUE Score')
         subplot.set_ylabel(titles[i - 1])
         subplot.set_title(
-            "\n" + titles[i - 1] + "\n τ: {:.3f}    ρ: {:.3f}".format(tau, rho)
+            # "\n" + titles[i - 1] + "\n 
+            "τ: {:.3f}    ρ: {:.3f}".format(tau, rho)
         )
 
         # Add a color bar to show the scale of the colors
         norm = plt.Normalize(data_list.min(), data_list.max())
         sm = plt.cm.ScalarMappable(cmap=cmap, norm=norm)
         sm.set_array([])
-        # fig.colorbar(sm, ax=subplot, fraction=0.046, pad=0.04)
+        fig.colorbar(sm, ax=subplot, fraction=0.046, pad=0.05)
 
     # Hide any unused subplots
     for j in range(i, 2 * 4):
