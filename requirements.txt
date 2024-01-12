@@ -11,5 +11,5 @@ scipy
 seaborn
 tensorflow>=2.9.1
 thop
-torch>=1.12
+torch
 transformers

@@ -3,12 +3,13 @@ import pandas as pd
 import numpy as np
 import seaborn as sns
 import matplotlib.pyplot as plt
-from scipy.stats import kendalltau, pearsonr
+from scipy.stats import kendalltau
 from matplotlib.ticker import ScalarFormatter
+from lpzero.utils.rank_consistency import spearman
 
 # Set global plot configurations
-mpl.rcParams["figure.figsize"] = [20, 10]
-mpl.rcParams.update({"font.size": 16})
+mpl.rcParams["figure.figsize"] = [13, 10]
+mpl.rcParams.update({"font.size": 13})
 mpl.rc("xtick", labelsize=13)
 mpl.rc("ytick", labelsize=13)
 
@@ -16,8 +17,8 @@ def plot_correlations_from_csv(csv_file_path):
     # Read the CSV data into a DataFrame
     df = pd.read_csv(csv_file_path)
     
-    fig, axs = plt.subplots(2, 4)
-    fig.tight_layout(h_pad=3, w_pad=3)
+    fig, axs = plt.subplots(3, 3)
+    fig.tight_layout(h_pad=2.5, w_pad=3)
 
     # Define the headers and corresponding column names in the DataFrame
     headers = [
@@ -28,7 +29,8 @@ def plot_correlations_from_csv(csv_file_path):
         ('Head Importance', 'Head Importance'),
         ('Head Confidence', 'Head Confidence'),
         ('Head Softmax Confidence', 'Head Softmax Confidence'),
-        ('Number of Parameters', 'Number of Parameters')
+        ('Number of Parameters', 'Number of Parameters'),
+        ('lpzero', 'lpzero')
     ]
 
     titles = [header for header, _ in headers]  # Get list of titles from headers
@@ -46,21 +48,22 @@ def plot_correlations_from_csv(csv_file_path):
             cmap = sns.color_palette("GnBu", as_cmap=True)
         elif i == 5:
             cmap = sns.color_palette("OrRd", as_cmap=True)
-        elif i == 8:
+        elif i == 7:
             cmap = sns.color_palette("RdPu", as_cmap=True)
-        elif i == 13:
+        elif i == 9:
             cmap = sns.color_palette("RdPu", as_cmap=True)
 
-        subplot = axs[(i - 1) // 4, (i - 1) % 4]
+        subplot = axs[(i - 1) // 3, (i - 1) % 3]
         subplot.yaxis.set_major_formatter(ScalarFormatter())
         
         tau, _ = kendalltau(gt_list, data_list)
-        rho, _ = pearsonr(gt_list, data_list)
+        rho = spearman(gt_list, data_list)
         
         data_list = (data_list - min(data_list)) / (max(data_list) - min(data_list))
         
         # Create the scatter plot directly with matplotlib to avoid conflicts
-        subplot.scatter(gt_list, data_list, c=data_list, cmap=cmap, s=15,
+        subplot.grid(True, linestyle='--', which='major', color='grey', alpha=.25)
+        subplot.scatter(gt_list, data_list, c=data_list, cmap=cmap, s=18,
                         edgecolor='black', linewidth=0.5)
         subplot.set_xlabel('GLUE Score')
         subplot.set_ylabel(titles[i - 1])
@@ -83,4 +86,4 @@ def plot_correlations_from_csv(csv_file_path):
     plt.savefig('combined_correlation.png')
 
 # Call the function with the path to your CSV file
-plot_correlations_from_csv('./BERT_results_activation.csv')
+plot_correlations_from_csv('./BERT_results_activation_2.csv')
