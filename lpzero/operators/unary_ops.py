@@ -4,11 +4,11 @@ from typing import TypeVar, Union
 import torch
 import torch.nn.functional as F
 
-Scalar = TypeVar('Scalar', torch.Tensor, float, int)
-Vector = TypeVar('Vector', torch.Tensor)
-Matrix = TypeVar('Matrix', torch.Tensor)
+Scalar = TypeVar('Scalar')
+Vector = TypeVar('Vector')
+Matrix = TypeVar('Matrix')
 
-ALLTYPE = Union[Scalar, Vector, Matrix]
+ALLTYPE = Union[Union[Scalar, Vector], Matrix]
 
 UNARY_KEYS = (
     'element_wise_log',
@@ -29,7 +29,15 @@ UNARY_KEYS = (
     'min_max_normalize',
     'to_mean_scalar',
     'to_std_scalar',
+    # 'p_dist',
+    'gram_matrix',
+    'element_wise_revert',
+    'element_wise_mish',
+    'element_wise_swish',
+    'element_wise_leaky_relu',
+    'to_sqrt_scalar',
     'no_op',
+    'pca',
 )
 
 
@@ -39,6 +47,21 @@ def sample_unary_key_by_prob(probability=None):
         probability = [0.1] * (len(UNARY_KEYS) - 1) + [0.2]
     return random.choices(list(range(len(UNARY_KEYS))), weights=probability, k=1)[0]
 
+# PCA Function
+def pca(A: Matrix, n_components: int = 2) -> Matrix:
+    """
+    Perform PCA on the given matrix and return the first n principal components.
+    A should be a 2D tensor.
+    """
+    # Centering the data (subtract the mean of each feature)
+    A_mean = torch.mean(A, dim=0)
+    A_centered = A - A_mean
+
+    # SVD
+    U, S, V = torch.svd(A_centered)
+
+    # Compute the principal components
+    return torch.mm(A_centered, V[:, :n_components])
 
 # unary operation
 def no_op(A: ALLTYPE) -> ALLTYPE:
@@ -106,7 +129,7 @@ def element_wise_relu(A: ALLTYPE) -> ALLTYPE:
 
 def element_wise_invert(A: ALLTYPE) -> ALLTYPE:
     if torch.any(A == 0):
-        raise ZeroDivisionError
+        return A 
     return 1 / A
 
 
@@ -173,7 +196,9 @@ def unary_operation(A, idx=None):
     if idx is None:
         idx = random.choice(range(len(UNARY_KEYS)))
 
-    assert idx < len(UNARY_KEYS)
+    # Assert replaced with a more descriptive error handling
+    if idx >= len(UNARY_KEYS):
+        raise ValueError("Index out of range for unary operations")
 
     unaries = {
         'element_wise_log': element_wise_log,
@@ -202,6 +227,7 @@ def unary_operation(A, idx=None):
         'element_wise_swish': element_wise_swish,
         'element_wise_leaky_relu': element_wise_leaky_relu,
         'to_sqrt_scalar': to_sqrt_scalar,
+        'pca': pca,
     }
 
     return unaries[UNARY_KEYS[idx]](A)

@@ -15,15 +15,12 @@ BINARY_KEYS = (
     'element_wise_difference',
     'element_wise_product',
     'matrix_multiplication',
-    'lesser_than',
-    'greater_than',
-    'equal_to',
     'hamming_distance',
+    'pairwise_distance',
     'kl_divergence',
     'cosine_similarity',
-    'pairwise_distance',
-    'l1_loss',
     'mse_loss',
+    'l1_loss',
 )
 
 
