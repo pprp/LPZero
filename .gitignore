@@ -4,3 +4,4 @@ plzero.egg-info/*
 logs/*
 *.log
 output/*
+*.png

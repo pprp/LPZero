@@ -6,6 +6,12 @@ import torch
 from datasets import load_dataset
 from scipy.stats import kendalltau, pearsonr
 from transformers import ElectraTokenizerFast
+import matplotlib.pyplot as plt
+import seaborn as sns
+import warnings
+from tqdm import tqdm 
+
+warnings.simplefilter(action='ignore', category=FutureWarning)
 
 from lpzero.model.flexibert.modeling_electra import (
     ElectraConfig,
@@ -78,6 +84,7 @@ def generate_bert(inputs):
 
         gt_list = []
         baseline_list = []
+        param_list = []
         sd_list, sdn_list = [], []
         ss_list, ssn_list = [], []
         ad_list, adn_list = [], []
@@ -86,7 +93,7 @@ def generate_bert(inputs):
         hc_list, hcn_list = [], []
         hsc_list, hscn_list = [], []
 
-        for i in range(500):
+        for i in tqdm(range(500)):
             np.random.seed(0)
             torch.manual_seed(0)
 
@@ -187,23 +194,51 @@ def generate_bert(inputs):
             hcn_list.append(attention_confidence_normalized(head_outputs))
             hsc_list.append(attention_confidence(softmax_outputs))
             hscn_list.append(attention_confidence_normalized(softmax_outputs))
+            param_list.append(num_parameters(model))
 
             writer.writerow(row)
             f.flush()
 
             print(str(configs[i]['id']))
+        
+        def plot_correlations():
+            headers = [
+                ('Synaptic Diversity', sd_list),
+                ('Synaptic Diversity Normalized', sdn_list),
+                ('Synaptic Saliency', ss_list),
+                ('Synaptic Saliency Normalized', ssn_list),
+                ('Activation Distance', ad_list),
+                ('Activation Distance Normalized', adn_list),
+                ('Jacobian Score', js_list),
+                ('Jacobian Score Normalized', jsn_list),
+                ('Head Importance', hi_list),
+                ('Head Importance Normalized', hin_list),
+                ('Head Confidence', hc_list),
+                ('Head Confidence Normalized', hcn_list),
+                ('Head Softmax Confidence', hsc_list),
+                ('Head Softmax Confidence Normalized', hscn_list),
+                ('Number of Parameters', param_list)
+            ]
 
-        # plot for ac, adn
-        import matplotlib.pyplot as plt
-        import seaborn as sns
+            sns.set_theme(style='whitegrid', context='talk', palette='Dark2')
+            sns.set_context('paper', font_scale=1.5)
 
-        sns.set_theme(style='whitegrid')
-        sns.set_context('paper', font_scale=1.5)
-        plt.figure(figsize=(8, 6))
-        plt.scatter(adn_list, gt_list, s=10)
-        plt.xlabel('Activation Distance Normalized')
-        plt.ylabel('GLUE Score')
-        plt.savefig('adn.png')
+            for header, data_list in headers:
+                plt.figure(figsize=(8, 6))
+                # replace data_list 's infs or nans with zero
+                data_list = np.nan_to_num(data_list, nan=0.0, posinf=0.0, neginf=0.0)
+
+                tau, _ = kendalltau(data_list, gt_list)
+                rho, _ = pearsonr(data_list, gt_list)
+                sns.regplot(x=data_list, y=gt_list, scatter_kws={'s': 10}, fit_reg=True)
+                plt.xlabel(header)
+                plt.ylabel('GLUE Score')
+                plt.title(f'Corr of {header} τ: {tau:.3f} ρ: {rho:.3f}')
+                sns.scatterplot(x=data_list, y=gt_list, size=3, edgecolor=None, hue_norm=(0, 7), legend=False)
+                plt.savefig(f'{header.replace(" ", "_").lower()}_correlation.png')
+                plt.close()
+        
+        plot_correlations()
 
 
 # predict the score of each candidate answer

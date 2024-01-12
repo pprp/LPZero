@@ -23,7 +23,7 @@ with open('./data/BERT_benchmark.json', 'r') as f:
 args = parse_args()
 
 
-def fitness_spearman(inputs, structure, device=None, num_sample=50):
+def fitness_spearman(inputs, structure, device=None, num_sample=500):
     """structure is belong to popultion."""
     device = device or torch.device(
         'cuda' if torch.cuda.is_available() else 'cpu')
@@ -96,7 +96,7 @@ def fitness_spearman(inputs, structure, device=None, num_sample=50):
     plt.xlabel('Ground Truth')
     plt.ylabel('Zero Cost (LPZero)')
     plt.title(f'Spearman Correlation: {sp}')
-    plt.savefig(f'./output/{structure}_200.png')
+    plt.savefig(f'./output/{structure}_500.png')
     return sp
 
 
@@ -122,14 +122,26 @@ if __name__ == '__main__':
     #     'input_geno': ['jacobs', 'head'],
     #     'op_geno': [[14, 8], [15, 10], 0],
     # } # 0.7474
-    genotype = {
-        'input_geno': ['head', 'act'],
-        'op_geno': [[2, 17], [18, 13], 0],
+    # genotype = { # better 
+    #     'input_geno': ['head', 'act'],
+    #     'op_geno': [[2, 17], [18, 13], 0],
+    # } 
+    genotype = { # 0.6928 but better 
+        'input_geno': ['head', 'head'],
+        'op_geno': [[3, 11], [8, 19], 0],
     }
+    # genotype = { # 0.6803 but better 
+    #     'input_geno': ['head', 'weight'],
+    #     'op_geno': [[8, 19], [17, 8], 0],
+    # }
+    # genotype = { # 0.6917 but better
+    #     'input_geno': ['softmax', 'head'],
+    #     'op_geno': [[19, 14], [8, 6], 0],
+    # }
     struct.genotype = genotype
     # Struct=INPUT:(head, act)
     # TREE:(to_std_scalar-element_wise_pow|normalize-sigmoid)
     # BINARY:(element_wise_product) Input=['head', 'act'] Op=[[18, 3], [5, 12], 2]
 
-    sp = fitness_spearman(inputs, struct, num_sample=200)
+    sp = fitness_spearman(inputs, struct, num_sample=500)
     print(f'Spearman of {struct} is {sp}')
