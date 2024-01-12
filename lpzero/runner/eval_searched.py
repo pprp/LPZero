@@ -1,8 +1,8 @@
 import json
-import pandas as pd
 
 import matplotlib.pyplot as plt
 import numpy as np
+import pandas as pd
 import torch
 from datasets import load_dataset
 from tqdm import tqdm
@@ -73,8 +73,9 @@ def fitness_spearman(inputs, structure, device=None, num_sample=500):
             return -1
     except TypeError as e:
         import pdb
+
         pdb.set_trace()
-    
+
     df['lpzero'] = zc_score
     df.to_csv('./BERT_results_activation_2.csv', index=False)
 
@@ -126,16 +127,16 @@ if __name__ == '__main__':
     genotype = {
         'input_geno': ['jacobs', 'head'],
         'op_geno': [[14, 8], [15, 10], 0],
-    } # 0.7474
-    # genotype = { # better 
+    }  # 0.7474
+    # genotype = { # better
     #     'input_geno': ['head', 'act'],
     #     'op_geno': [[2, 17], [18, 13], 0],
-    # } 
-    # genotype = { # 0.6928 but better 
+    # }
+    # genotype = { # 0.6928 but better
     #     'input_geno': ['head', 'head'],
     #     'op_geno': [[3, 11], [8, 19], 0],
     # }
-    # genotype = { # 0.6803 but better 
+    # genotype = { # 0.6803 but better
     #     'input_geno': ['head', 'weight'],
     #     'op_geno': [[8, 19], [17, 8], 0],
     # }

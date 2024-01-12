@@ -1,23 +1,23 @@
-import csv
-import json
-
-import numpy as np
-import torch
-from datasets import load_dataset
-from scipy.stats import kendalltau, pearsonr
-from transformers import ElectraTokenizerFast
-import matplotlib.pyplot as plt
-import seaborn as sns
-import warnings
-from tqdm import tqdm 
-
-warnings.simplefilter(action='ignore', category=FutureWarning)
-
 from lpzero.model.flexibert.modeling_electra import (
     ElectraConfig,
     ElectraLayer,
     ElectraModel,
 )
+import csv
+import json
+import warnings
+
+import matplotlib.pyplot as plt
+import numpy as np
+import seaborn as sns
+import torch
+from datasets import load_dataset
+from scipy.stats import kendalltau, pearsonr
+from tqdm import tqdm
+from transformers import ElectraTokenizerFast
+
+warnings.simplefilter(action='ignore', category=FutureWarning)
+
 from lpzero.predictor.measures import *  # noqa: F403
 
 configs = []
@@ -200,7 +200,7 @@ def generate_bert(inputs):
             f.flush()
 
             print(str(configs[i]['id']))
-        
+
         def plot_correlations():
             headers = [
                 ('Synaptic Diversity', sd_list),
@@ -210,7 +210,7 @@ def generate_bert(inputs):
                 ('Head Importance', hi_list),
                 ('Head Confidence', hc_list),
                 ('Head Softmax Confidence', hsc_list),
-                ('Number of Parameters', param_list)
+                ('Number of Parameters', param_list),
             ]
 
             # Set up the matplotlib figure
@@ -221,19 +221,22 @@ def generate_bert(inputs):
             sns.set_theme(style='whitegrid', context='talk', palette='Dark2')
             sns.set_context('paper', font_scale=1.2)
 
-            fig, axes = plt.subplots(rows, cols, figsize=(cols*6, rows*4))
+            fig, axes = plt.subplots(rows, cols, figsize=(cols * 6, rows * 4))
             fig.tight_layout(pad=5.0)
 
             for index, (header, data_list) in enumerate(headers):
                 ax = axes[index // cols, index % cols]
 
                 # Replace data_list's infs or nans with zero
-                data_list = np.nan_to_num(data_list, nan=0.0, posinf=0.0, neginf=0.0)
+                data_list = np.nan_to_num(
+                    data_list, nan=0.0, posinf=0.0, neginf=0.0)
 
                 tau, _ = kendalltau(data_list, gt_list)
                 rho, _ = pearsonr(data_list, gt_list)
 
-                sns.regplot(x=gt_list, y=data_list, scatter_kws={'s': 10}, fit_reg=True, ax=ax)
+                sns.regplot(
+                    x=gt_list, y=data_list, scatter_kws={'s': 10}, fit_reg=True, ax=ax
+                )
                 ax.set_ylabel(header)
                 ax.set_xlabel('GLUE Score')
                 ax.set_title(f'τ: {tau:.3f} ρ: {rho:.3f}')
@@ -242,15 +245,24 @@ def generate_bert(inputs):
                 ax.set_xlim([min(gt_list), max(gt_list)])
                 ax.set_ylim([min(data_list), max(data_list)])
 
-                sns.scatterplot(x=gt_list, y=data_list, size=3, edgecolor=None, hue_norm=(0, 7), legend=False, ax=ax)
+                sns.scatterplot(
+                    x=gt_list,
+                    y=data_list,
+                    size=3,
+                    edgecolor=None,
+                    hue_norm=(0, 7),
+                    legend=False,
+                    ax=ax,
+                )
 
             # Hide any unused subplots
             for i in range(index + 1, rows * cols):
                 fig.delaxes(axes.flatten()[i])
 
             plt.savefig('combined_correlation.png')
-        
+
         plot_correlations()
+
 
 if __name__ == '__main__':
     inputs = generate_inputs()

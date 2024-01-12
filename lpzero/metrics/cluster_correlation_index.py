@@ -40,4 +40,4 @@ def measure_cluster_corr_index(
     # Spearman Correlation
     spearman_corr, _ = spearmanr(X[:, 0], X[:, 1])
 
-    return spearman_corr + lam * mi 
+    return spearman_corr + lam * mi

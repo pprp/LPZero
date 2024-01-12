@@ -4,11 +4,11 @@ from typing import TypeVar, Union
 import torch
 import torch.nn.functional as F
 
-Scalar = TypeVar('Scalar')
-Vector = TypeVar('Vector')
-Matrix = TypeVar('Matrix')
+Scalar = TypeVar('Scalar', torch.Tensor, float, int)
+Vector = TypeVar('Vector', torch.Tensor)
+Matrix = TypeVar('Matrix', torch.Tensor)
 
-ALLTYPE = Union[Union[Scalar, Vector], Matrix]
+ALLTYPE = Union[Scalar, Vector, Matrix]
 
 UNARY_KEYS = (
     'element_wise_log',
@@ -26,39 +26,28 @@ UNARY_KEYS = (
     'sigmoid',
     'logsoftmax',
     'element_wise_sqrt',
-    'element_wise_revert',
     'min_max_normalize',
     'to_mean_scalar',
     'to_std_scalar',
     'no_op',
 )
-SCALAR_KEYS = ('to_mean_scalar', 'to_std_scalar')
 
-# remove `gram_matrix` for now to avoid OOM
-# remove `element_wise_sign`
-# remove `to_sum_scalar` for it is equaivalent to `to_mean_scalar` in the
-#         context of zero-cost proxy
 
 # sample key by probability
-
-
 def sample_unary_key_by_prob(probability=None):
     if probability is None:
-        # other than the last one, the rest are the same small
         probability = [0.1] * (len(UNARY_KEYS) - 1) + [0.2]
     return random.choices(list(range(len(UNARY_KEYS))), weights=probability, k=1)[0]
 
 
 # unary operation
-
-
 def no_op(A: ALLTYPE) -> ALLTYPE:
     return A
 
 
 def element_wise_log(A: ALLTYPE) -> ALLTYPE:
-    A[A <= 0] == 1
-    return torch.log(A + 1e-9)
+    A[A <= 0] = 1
+    return torch.log(A)
 
 
 def element_wise_revert(A: ALLTYPE) -> ALLTYPE:
@@ -107,24 +96,18 @@ def element_wise_exp(A: ALLTYPE) -> ALLTYPE:
 
 def normalize(A: ALLTYPE) -> ALLTYPE:
     m = torch.mean(A)
-    s = torch.std(A)
-    C = (A - m) / s
-    C[C != C] = 0
-    return C
+    s = torch.std(A) + 1e-9
+    return (A - m) / s
 
 
 def element_wise_relu(A: ALLTYPE) -> ALLTYPE:
     return F.relu(A)
 
 
-def element_wise_sign(A: ALLTYPE) -> ALLTYPE:
-    return torch.sign(A)
-
-
 def element_wise_invert(A: ALLTYPE) -> ALLTYPE:
-    if isinstance(A, (int, float)) and A == 0:
+    if torch.any(A == 0):
         raise ZeroDivisionError
-    return 1 / (A + 1e-9)
+    return 1 / A
 
 
 def frobenius_norm(A: ALLTYPE) -> Scalar:
@@ -132,11 +115,11 @@ def frobenius_norm(A: ALLTYPE) -> Scalar:
 
 
 def element_wise_normalized_sum(A: ALLTYPE) -> Scalar:
-    return torch.sum(A) / (A.numel() + 1e-9)
+    return torch.sum(A) / A.numel()
 
 
 def l1_norm(A: ALLTYPE) -> Scalar:
-    return torch.sum(torch.abs(A)) / (A.numel() + 1e-9)
+    return torch.sum(torch.abs(A)) / A.numel()
 
 
 def p_dist(A: Matrix) -> Vector:
@@ -155,9 +138,9 @@ def sigmoid(A: ALLTYPE) -> ALLTYPE:
     return torch.sigmoid(A)
 
 
-def slogdet(A: Matrix) -> Scalar:
-    sign, value = torch.linalg.slogdet(A)
-    return value
+def min_max_normalize(A: ALLTYPE) -> ALLTYPE:
+    A_min, A_max = A.min(), A.max()
+    return (A - A_min) / (A_max - A_min + 1e-9)
 
 
 def to_mean_scalar(A: ALLTYPE) -> Scalar:
@@ -170,18 +153,6 @@ def to_sum_scalar(A: ALLTYPE) -> Scalar:
 
 def to_std_scalar(A: ALLTYPE) -> Scalar:
     return torch.std(A)
-
-
-def to_var_scalar(A: ALLTYPE) -> Scalar:
-    return torch.var(A)
-
-
-def to_min_scalar(A: ALLTYPE) -> Scalar:
-    return torch.min(A)
-
-
-def to_max_scalar(A: ALLTYPE) -> Scalar:
-    return torch.max(A)
 
 
 def to_sqrt_scalar(A: ALLTYPE) -> Scalar:
@@ -212,25 +183,25 @@ def unary_operation(A, idx=None):
         'element_wise_exp': element_wise_exp,
         'normalize': normalize,
         'element_wise_relu': element_wise_relu,
-        'element_wise_sign': element_wise_sign,
         'element_wise_invert': element_wise_invert,
         'frobenius_norm': frobenius_norm,
         'element_wise_normalized_sum': element_wise_normalized_sum,
         'l1_norm': l1_norm,
         'softmax': softmax,
-        'sigmoid': sigmoid,
-        'p_dist': p_dist,
-        'to_mean_scalar': to_mean_scalar,
-        'to_sum_scalar': to_sum_scalar,
-        'to_std_scalar': to_std_scalar,
-        'to_min_scalar': to_min_scalar,
-        'to_max_scalar': to_max_scalar,
-        'to_sqrt_scalar': to_sqrt_scalar,
-        'gram_matrix': gram_matrix,
         'logsoftmax': logsoftmax,
-        'element_wise_sqrt': element_wise_sqrt,
+        'sigmoid': sigmoid,
         'min_max_normalize': min_max_normalize,
-        'element_wise_revert': element_wise_revert,
+        'element_wise_sqrt': element_wise_sqrt,
+        'to_mean_scalar': to_mean_scalar,
+        'to_std_scalar': to_std_scalar,
         'no_op': no_op,
+        'p_dist': p_dist,
+        'gram_matrix': gram_matrix,
+        'element_wise_revert': element_wise_revert,
+        'element_wise_mish': element_wise_mish,
+        'element_wise_swish': element_wise_swish,
+        'element_wise_leaky_relu': element_wise_leaky_relu,
+        'to_sqrt_scalar': to_sqrt_scalar,
     }
+
     return unaries[UNARY_KEYS[idx]](A)

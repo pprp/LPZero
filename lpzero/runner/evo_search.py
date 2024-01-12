@@ -2,9 +2,10 @@ import argparse
 import csv
 import json
 import math
+import os
 import random
 from typing import Union
-import os 
+
 import matplotlib.pyplot as plt
 import numpy as np
 import torch
@@ -13,6 +14,7 @@ from loguru import logger
 from torch import Tensor
 from transformers import ElectraTokenizerFast
 
+from lpzero.metrics.cluster_correlation_index import measure_cluster_corr_index
 from lpzero.model.flexibert.modeling_electra import (
     ElectraConfig,
     ElectraLayer,
@@ -20,7 +22,6 @@ from lpzero.model.flexibert.modeling_electra import (
 )
 from lpzero.structures import GraphStructure, LinearStructure, TreeStructure
 from lpzero.utils.rank_consistency import spearman
-from lpzero.metrics.cluster_correlation_index import measure_cluster_corr_index
 
 configs = []
 with open('./data/BERT_benchmark.json', 'r') as f:
@@ -143,6 +144,7 @@ def ori_fitness_spearman(inputs, structure, device=None, num_sample=50):
             return -1
     except TypeError as e:
         import pdb
+
         pdb.set_trace()
 
     # release memory
@@ -159,7 +161,7 @@ def ori_fitness_spearman(inputs, structure, device=None, num_sample=50):
         'gt_list': gt_score,
         'zc_list': zc_score,
     }
-    
+
     cci = measure_cluster_corr_index(gt_score, zc_score, 1, 3)
     return cci
 
@@ -182,8 +184,11 @@ fitness_spearman = ori_fitness_spearman
 
 def compute_fitness(struct, cache, inputs):
     if struct.unique_id not in cache:
-        cache[struct.unique_id] = fitness_spearman(inputs, struct, num_sample=args.num_sample)
+        cache[struct.unique_id] = fitness_spearman(
+            inputs, struct, num_sample=args.num_sample
+        )
     return cache[struct.unique_id]
+
 
 def is_anomaly(zc_score: Union[torch.Tensor, float, int] = None) -> bool:
     """filter the score with -1,0,nan,inf"""
@@ -223,10 +228,9 @@ def evolution_search(inputs, structure, iterations=1000, popu_size=50):
     logger.info('Begin the evolution process...')
     for i in range(iterations):
         scores = [
-            compute_fitness(struct, fitness_cache, inputs)
-            for struct in population
+            compute_fitness(struct, fitness_cache, inputs) for struct in population
         ]
-        
+
         # select the best one from the population
         scores = np.array(scores)
         argidxs = np.argsort(scores)[::-1]
@@ -265,20 +269,23 @@ def evolution_search(inputs, structure, iterations=1000, popu_size=50):
             population.append(offspring_struct)
         else:
             population.append(newbie)
-        
+
         # 4. only keep top N structures
         # Sort population based on their fitness
-        population = sorted(population, key=lambda x: compute_fitness(x, fitness_cache, inputs), reverse=True)
+        population = sorted(
+            population,
+            key=lambda x: compute_fitness(x, fitness_cache, inputs),
+            reverse=True,
+        )
         population = population[:popu_size]
 
         # 6. assert the population size should not shrink
-        assert len(
-            population) == popu_size, f'Population size should be {popu_size} but got {len(population)}'
+        assert (
+            len(population) == popu_size
+        ), f'Population size should be {popu_size} but got {len(population)}'
 
     # evaluate the fitness of all structures
-    scores = [
-        compute_fitness(s, fitness_cache, inputs) for s in population
-    ]
+    scores = [compute_fitness(s, fitness_cache, inputs) for s in population]
     argidxs = np.argsort(scores)[::-1]
     running_struct = population[argidxs[0]]
     logger.info(
@@ -286,7 +293,9 @@ def evolution_search(inputs, structure, iterations=1000, popu_size=50):
     )
 
     # plot the evolution process
-    save_name = f'evolution_{iterations}_{popu_size}_{os.path.basename(args.log_path)[:-4]}'
+    save_name = (
+        f'evolution_{iterations}_{popu_size}_{os.path.basename(args.log_path)[:-4]}'
+    )
     plt.plot(idx, sps)
     plt.xlabel('Iteration')
     plt.ylabel('Spearman')
@@ -296,7 +305,7 @@ def evolution_search(inputs, structure, iterations=1000, popu_size=50):
     with open(f'./output/{save_name}_with_diversity.csv', 'w') as f:
         writer = csv.writer(f)
         writer.writerows(zip(idx, sps))
-    
+
     # save cache to json
     with open(f'./output/{save_name}_with_diversity_cache.json', 'w') as f:
         json.dump(fitness_cache, f)

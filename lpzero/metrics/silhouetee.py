@@ -20,7 +20,8 @@ def measure_silhouette(var1, var2, n_clusters=8, random_state=42):
     X = np.column_stack((var1, var2))
 
     # Perform KMeans clustering
-    kmeans = KMeans(n_clusters=n_clusters, random_state=random_state, n_init='auto')
+    kmeans = KMeans(n_clusters=n_clusters,
+                    random_state=random_state, n_init='auto')
     labels = kmeans.fit_predict(X)
 
     # Calculate the silhouette score
