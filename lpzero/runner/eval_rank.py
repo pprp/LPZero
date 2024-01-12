@@ -204,46 +204,53 @@ def generate_bert(inputs):
         def plot_correlations():
             headers = [
                 ('Synaptic Diversity', sd_list),
-                ('Synaptic Diversity Normalized', sdn_list),
                 ('Synaptic Saliency', ss_list),
-                ('Synaptic Saliency Normalized', ssn_list),
                 ('Activation Distance', ad_list),
-                ('Activation Distance Normalized', adn_list),
                 ('Jacobian Score', js_list),
-                ('Jacobian Score Normalized', jsn_list),
                 ('Head Importance', hi_list),
-                ('Head Importance Normalized', hin_list),
                 ('Head Confidence', hc_list),
-                ('Head Confidence Normalized', hcn_list),
                 ('Head Softmax Confidence', hsc_list),
-                ('Head Softmax Confidence Normalized', hscn_list),
                 ('Number of Parameters', param_list)
             ]
 
-            sns.set_theme(style='whitegrid', context='talk', palette='Dark2')
-            sns.set_context('paper', font_scale=1.5)
+            # Set up the matplotlib figure
+            num_plots = len(headers)
+            cols = 2  # You can change this to your desired number of columns
+            rows = num_plots // cols + (num_plots % cols > 0)
 
-            for header, data_list in headers:
-                plt.figure(figsize=(8, 6))
-                # replace data_list 's infs or nans with zero
+            sns.set_theme(style='whitegrid', context='talk', palette='Dark2')
+            sns.set_context('paper', font_scale=1.2)
+
+            fig, axes = plt.subplots(rows, cols, figsize=(cols*6, rows*4))
+            fig.tight_layout(pad=5.0)
+
+            for index, (header, data_list) in enumerate(headers):
+                ax = axes[index // cols, index % cols]
+
+                # Replace data_list's infs or nans with zero
                 data_list = np.nan_to_num(data_list, nan=0.0, posinf=0.0, neginf=0.0)
 
                 tau, _ = kendalltau(data_list, gt_list)
                 rho, _ = pearsonr(data_list, gt_list)
-                sns.regplot(x=data_list, y=gt_list, scatter_kws={'s': 10}, fit_reg=True)
-                plt.xlabel(header)
-                plt.ylabel('GLUE Score')
-                plt.title(f'Corr of {header} τ: {tau:.3f} ρ: {rho:.3f}')
-                sns.scatterplot(x=data_list, y=gt_list, size=3, edgecolor=None, hue_norm=(0, 7), legend=False)
-                plt.savefig(f'{header.replace(" ", "_").lower()}_correlation.png')
-                plt.close()
+
+                sns.regplot(x=gt_list, y=data_list, scatter_kws={'s': 10}, fit_reg=True, ax=ax)
+                ax.set_ylabel(header)
+                ax.set_xlabel('GLUE Score')
+                ax.set_title(f'τ: {tau:.3f} ρ: {rho:.3f}')
+
+                # Optionally, adjust the limits and other aesthetics
+                ax.set_xlim([min(gt_list), max(gt_list)])
+                ax.set_ylim([min(data_list), max(data_list)])
+
+                sns.scatterplot(x=gt_list, y=data_list, size=3, edgecolor=None, hue_norm=(0, 7), legend=False, ax=ax)
+
+            # Hide any unused subplots
+            for i in range(index + 1, rows * cols):
+                fig.delaxes(axes.flatten()[i])
+
+            plt.savefig('combined_correlation.png')
         
         plot_correlations()
-
-
-# predict the score of each candidate answer
-
-# calculate the rank consistency
 
 if __name__ == '__main__':
     inputs = generate_inputs()
