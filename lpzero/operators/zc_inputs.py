@@ -59,21 +59,21 @@ def compute_head(model, inputs, **kwargs) -> List:
     return head_outputs
 
 
-@zc_candidates('softmax')
-def compute_softmax(model, inputs, **kwargs) -> List:
-    """softmax output"""
-    softmax_outputs = []
+# @zc_candidates('softmax')
+# def compute_softmax(model, inputs, **kwargs) -> List:
+#     """softmax output"""
+#     softmax_outputs = []
 
-    def softmax_hook(module, input, output):
-        softmax_outputs.append(output.detach())
+#     def softmax_hook(module, input, output):
+#         softmax_outputs.append(output.detach())
 
-    for layer in model.modules():
-        if isinstance(layer, ElectraLayer):
-            sublayer = layer.operation.operation
-            if hasattr(sublayer, 'softmax'):
-                sublayer.softmax.register_forward_hook(softmax_hook)
-    model(**inputs)
-    return softmax_outputs
+#     for layer in model.modules():
+#         if isinstance(layer, ElectraLayer):
+#             sublayer = layer.operation.operation
+#             if hasattr(sublayer, 'softmax'):
+#                 sublayer.softmax.register_forward_hook(softmax_hook)
+#     model(**inputs)
+#     return softmax_outputs
 
 
 @zc_candidates('grad')

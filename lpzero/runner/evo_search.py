@@ -165,9 +165,7 @@ def ori_fitness_spearman(inputs, structure, device=None, num_sample=50):
         'gt_list': gt_score,
         'zc_list': zc_score,
     }
-
-    cci = measure_cluster_corr_index(gt_score, zc_score, 1, 3)
-    return cci
+    return sp 
 
 
 def dummy_fitness_spearman(inputs, structure, device=None, num_sample=50):
@@ -243,7 +241,7 @@ def evolution_search(inputs, structure, iterations=1000, popu_size=50):
         # best structure on the run
         running_struct = population[argidxs[0]]
         logger.info(
-            f'Iter: {i} Best CCI: {scores[argidxs[0]]} Struct={running_struct} Input={running_struct.genotype["input_geno"]} Op={running_struct.genotype["op_geno"]}'
+            f'Iter: {i} Best sp: {scores[argidxs[0]]} Struct={running_struct} Input={running_struct.genotype["input_geno"]} Op={running_struct.genotype["op_geno"]}'
         )
 
         # add data for matplotlib plot
@@ -294,7 +292,7 @@ def evolution_search(inputs, structure, iterations=1000, popu_size=50):
     argidxs = np.argsort(scores)[::-1]
     running_struct = population[argidxs[0]]
     logger.info(
-        f'After {iterations} iters: Best CCI:{scores[argidxs[0]]} Struct={running_struct} Input={running_struct.genotype["input_geno"]} Op={running_struct.genotype["op_geno"]}'
+        f'After {iterations} iters: Best sp:{scores[argidxs[0]]} Struct={running_struct} Input={running_struct.genotype["input_geno"]} Op={running_struct.genotype["op_geno"]}'
     )
 
     # plot the evolution process

@@ -18,7 +18,7 @@ BINARY_KEYS = (
     'hamming_distance',
     'pairwise_distance',
     # 'kl_divergence',
-    'cosine_similarity',
+    # 'cosine_similarity',
     'mse_loss',
     'l1_loss',
 )
