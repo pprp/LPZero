@@ -22,6 +22,10 @@ from lpzero.model.flexibert.modeling_electra import (
 )
 from lpzero.structures import GraphStructure, LinearStructure, TreeStructure
 from lpzero.utils.rank_consistency import spearman
+import warnings
+
+# FutureWarning
+warnings.simplefilter(action='ignore', category=FutureWarning)
 
 configs = []
 with open('./data/BERT_benchmark.json', 'r') as f:
@@ -214,6 +218,7 @@ def evolution_search(inputs, structure, iterations=1000, popu_size=50):
 
     while len(population) < popu_size:
         struct = structure()
+        logger.info(f'Current structure: {struct}')
         score = compute_fitness(struct, fitness_cache, inputs)
         if is_anomaly(score):
             continue
@@ -342,13 +347,9 @@ def generate_inputs():
 if __name__ == '__main__':
     inputs = generate_inputs()
 
-    # preprocess search space structure
-    if args.search_structure == 'linear':
-        structure = LinearStructure
-    elif args.search_structure == 'tree':
+
+    if args.search_structure == 'tree':
         structure = TreeStructure
-    elif args.search_structure == 'graph':
-        structure = GraphStructure
     else:
         raise NotImplementedError(
             f'Not support {args.search_structure} structure.')

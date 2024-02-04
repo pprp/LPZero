@@ -92,8 +92,8 @@ class TreeStructure(BaseStructure):
         self._repr_geno = repr_geno
 
     def forward_tree(self, inputs, model, return_all=False):
-        try:
-            # if True:
+        # try:
+        if True:
             A1, A2 = self._genotype['input_geno']
             A1 = get_zc_candidates(
                 self._genotype['input_geno'][0],
@@ -132,9 +132,9 @@ class TreeStructure(BaseStructure):
                 A.append(binary_operation(
                     a1, a2, self._genotype['op_geno'][2]))
 
-        except Exception as e:
-            print('GOT ERROR in TREE STRUCTURE:', e)
-            return -1
+        # except Exception as e:
+        #     print('GOT ERROR in TREE STRUCTURE:', e)
+        #     return -1
 
         if return_all:
             return A, convert_to_float(A)

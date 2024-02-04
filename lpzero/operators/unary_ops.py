@@ -27,17 +27,17 @@ UNARY_KEYS = (
     'logsoftmax',
     'element_wise_sqrt',
     'min_max_normalize',
-    'to_mean_scalar',
-    'to_std_scalar',
+    # 'to_mean_scalar',
+    # 'to_std_scalar',
     # 'p_dist',
     'gram_matrix',
     'element_wise_revert',
     'element_wise_mish',
     'element_wise_swish',
     'element_wise_leaky_relu',
-    'to_sqrt_scalar',
+    # 'to_sqrt_scalar',
     'no_op',
-    'pca',
+    # 'pca',
 )
 
 
