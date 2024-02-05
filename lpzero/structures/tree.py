@@ -69,7 +69,6 @@ class TreeStructure(BaseStructure):
         geno = []
         repr_geno = ''
         repr_geno += f'INPUT:({zc_name_list[0]}, {zc_name_list[1]})'
-        
         # for input1
         geno.append([])
         unary1x2 = [sample_unary_key_by_prob() for _ in range(2)]
@@ -84,6 +83,7 @@ class TreeStructure(BaseStructure):
 
         # for binary operation
         binaryx1 = sample_binary_key_by_prob()
+        print('binaryx1', binaryx1)
         repr_geno += f'BINARY:({BINARY_KEYS[binaryx1]})'
         geno.append(binaryx1)
 
@@ -94,7 +94,7 @@ class TreeStructure(BaseStructure):
 
     def forward_tree(self, inputs, model, return_all=False):
         try:
-        # if True:
+            # if True:
             A1, A2 = self._genotype['input_geno']
             A1 = get_zc_candidates(
                 self._genotype['input_geno'][0],
@@ -112,7 +112,6 @@ class TreeStructure(BaseStructure):
                 inputs=inputs,
                 loss_fn=nn.CrossEntropyLoss(),
             )
-            
 
             # process input1 with two unary operations
             A1 = [unary_operation(a, self._genotype['op_geno'][0][0])
@@ -125,11 +124,7 @@ class TreeStructure(BaseStructure):
                   for a in A2]
             A2 = [unary_operation(a, self._genotype['op_geno'][1][1])
                   for a in A2]
-            
 
-            # A1 and A2 -> assert shape is same
-            assert len(A1) == len(A2), f'Length of A1 and A2 should be same, got {len(A1)} and {len(A2)}'
-            
             # process binary operation
             A = []
             for a1, a2 in zip(A1, A2):
@@ -137,6 +132,7 @@ class TreeStructure(BaseStructure):
                 a2 = convert_to_float(a2)
                 A.append(binary_operation(
                     a1, a2, self._genotype['op_geno'][2]))
+
         except Exception as e:
             print('GOT ERROR in TREE STRUCTURE:', e)
             return -1

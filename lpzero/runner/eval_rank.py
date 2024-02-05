@@ -1,8 +1,3 @@
-from lpzero.model.flexibert.modeling_electra import (
-    ElectraConfig,
-    ElectraLayer,
-    ElectraModel,
-)
 import csv
 import json
 import warnings
@@ -15,6 +10,12 @@ from datasets import load_dataset
 from scipy.stats import kendalltau, pearsonr
 from tqdm import tqdm
 from transformers import ElectraTokenizerFast
+
+from lpzero.model.flexibert.modeling_electra import (
+    ElectraConfig,
+    ElectraLayer,
+    ElectraModel,
+)
 
 warnings.simplefilter(action='ignore', category=FutureWarning)
 

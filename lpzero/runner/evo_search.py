@@ -1,8 +1,11 @@
 import argparse
 import csv
 import json
+import os 
+
+# build logger
+import logging
 import math
-import os
 import random
 from typing import Union
 
@@ -14,7 +17,6 @@ from loguru import logger
 from torch import Tensor
 from transformers import ElectraTokenizerFast
 
-from lpzero.metrics.cluster_correlation_index import measure_cluster_corr_index
 from lpzero.model.flexibert.modeling_electra import (
     ElectraConfig,
     ElectraLayer,
@@ -22,16 +24,12 @@ from lpzero.model.flexibert.modeling_electra import (
 )
 from lpzero.structures import GraphStructure, LinearStructure, TreeStructure
 from lpzero.utils.rank_consistency import spearman
-import warnings
-
-# FutureWarning
-warnings.simplefilter(action='ignore', category=FutureWarning)
 
 configs = []
 with open('./data/BERT_benchmark.json', 'r') as f:
     configs = json.load(f)
 
-# memory dict key:genotype value: {sp, mutual, silhouette}
+# save memory to file    
 mem_dict = {}
 
 
@@ -100,13 +98,13 @@ def all_same(items):
     return all(x == items[0] for x in items)
 
 
-def ori_fitness_spearman(inputs, structure, device=None, num_sample=50):
+def fitness_spearman(structure, inputs, device=None, num_sample=50):
     """structure is belong to popultion."""
-    device = device or torch.device(
-        'cuda' if torch.cuda.is_available() else 'cpu')
-
     if structure.sp_score != -1:
         return structure.sp_score
+
+    device = device or torch.device(
+        'cuda' if torch.cuda.is_available() else 'cpu')
 
     gt_score = []
     zc_score = []
@@ -160,36 +158,8 @@ def ori_fitness_spearman(inputs, structure, device=None, num_sample=50):
     if structure.sp_score == -1:
         structure.sp_score = sp
 
-    mem_dict[str(structure)] = {
-        'sp': sp,
-        'gt_list': gt_score,
-        'zc_list': zc_score,
-    }
-    return sp 
-
-
-def dummy_fitness_spearman(inputs, structure, device=None, num_sample=50):
-    # Just for test acceleration
-    gt_score = np.random.rand(num_sample)
-    zc_score = np.random.rand(num_sample)
-    sp = spearman(gt_score, zc_score)
-    mem_dict[str(structure)] = {
-        'sp': sp,
-        'gt_list': gt_score.tolist(),
-        'zc_list': zc_score.tolist(),
-    }
+    mem_dict[str(structure)] = [gt_score, zc_score, sp]
     return sp
-
-
-fitness_spearman = ori_fitness_spearman
-
-
-def compute_fitness(struct, cache, inputs):
-    if struct.unique_id not in cache:
-        cache[struct.unique_id] = fitness_spearman(
-            inputs, struct, num_sample=args.num_sample
-        )
-    return cache[struct.unique_id]
 
 
 def is_anomaly(zc_score: Union[torch.Tensor, float, int] = None) -> bool:
@@ -208,16 +178,14 @@ def is_anomaly(zc_score: Union[torch.Tensor, float, int] = None) -> bool:
     return False
 
 
-def evolution_search(inputs, structure, iterations=1000, popu_size=50):
+def evolution_search(structure, inputs, iterations=1000, popu_size=50):
     # random initialize N structures for evolution
     population = []
-    fitness_cache = {}
     logger.info('Initialize population')
 
     while len(population) < popu_size:
         struct = structure()
-        logger.info(f'Current structure: {struct}')
-        score = compute_fitness(struct, fitness_cache, inputs)
+        score = fitness_spearman(struct, inputs)
         if is_anomaly(score):
             continue
         logger.info(f'Current population size: {len(population)}')
@@ -230,10 +198,7 @@ def evolution_search(inputs, structure, iterations=1000, popu_size=50):
     # run the cycle
     logger.info('Begin the evolution process...')
     for i in range(iterations):
-        scores = [
-            compute_fitness(struct, fitness_cache, inputs) for struct in population
-        ]
-
+        scores = [fitness_spearman(struct, inputs) for struct in population]
         # select the best one from the population
         scores = np.array(scores)
         argidxs = np.argsort(scores)[::-1]
@@ -241,7 +206,7 @@ def evolution_search(inputs, structure, iterations=1000, popu_size=50):
         # best structure on the run
         running_struct = population[argidxs[0]]
         logger.info(
-            f'Iter: {i} Best sp: {scores[argidxs[0]]} Struct={running_struct} Input={running_struct.genotype["input_geno"]} Op={running_struct.genotype["op_geno"]}'
+            f'Iter: {i} Best SP: {scores[argidxs[0]]} Struct={running_struct} Input={running_struct.genotype["input_geno"]} Op={running_struct.genotype["op_geno"]}'
         )
 
         # add data for matplotlib plot
@@ -262,56 +227,38 @@ def evolution_search(inputs, structure, iterations=1000, popu_size=50):
             # 2. mutation
             offspring_struct = offspring_struct.mutate_by_genotype()
 
-        # 3. Diversity-prompting selection
-        offspring_zc = compute_fitness(struct, fitness_cache, inputs)
-        newbie = structure()
-        newbie_zc = compute_fitness(struct, fitness_cache, inputs)
+        del population[argidxs[-1]]
 
-        # 5. add better offspring or newbie to population
-        if offspring_zc > newbie_zc:
-            population.append(offspring_struct)
-        else:
-            population.append(newbie)
-
-        # 4. only keep top N structures
-        # Sort population based on their fitness
-        population = sorted(
-            population,
-            key=lambda x: compute_fitness(x, fitness_cache, inputs),
-            reverse=True,
-        )
-        population = population[:popu_size]
+        population.append(offspring_struct)
 
         # 6. assert the population size should not shrink
-        assert (
-            len(population) == popu_size
-        ), f'Population size should be {popu_size} but got {len(population)}'
+        assert len(
+            population) == popu_size, f'Population size should be {popu_size}'
 
     # evaluate the fitness of all structures
-    scores = [compute_fitness(s, fitness_cache, inputs) for s in population]
+    scores = [fitness_spearman(s, inputs) for s in population]
     argidxs = np.argsort(scores)[::-1]
     running_struct = population[argidxs[0]]
     logger.info(
-        f'After {iterations} iters: Best sp:{scores[argidxs[0]]} Struct={running_struct} Input={running_struct.genotype["input_geno"]} Op={running_struct.genotype["op_geno"]}'
+        f'After {iterations} iters: Best SP:{scores[argidxs[0]]} Struct={running_struct} Input={running_struct.genotype["input_geno"]} Op={running_struct.genotype["op_geno"]}'
     )
 
     # plot the evolution process
-    save_name = (
-        f'evolution_{iterations}_{popu_size}_{os.path.basename(args.log_path)[:-4]}'
-    )
+    save_name = f'evolution_{type(offspring_struct)}_{iterations}_{popu_size}_{random.randint(0, 1000)}_test'
     plt.plot(idx, sps)
     plt.xlabel('Iteration')
     plt.ylabel('Spearman')
-    plt.savefig(f'./output/{save_name}_with_diversity.png')
+    if not os.path.exists('./output/evo_search_emq_zc'):
+        os.makedirs('./output/evo_search_emq_zc')
+
+    plt.savefig(f'./output/evo_search_emq_zc/{save_name}.png')
 
     # save idx and sps into csv file
-    with open(f'./output/{save_name}_with_diversity.csv', 'w') as f:
+    if not os.path.exists('./output/csv_files'):
+        os.makedirs('./output/csv_files')
+    with open(f'./output/csv_files/{save_name}.csv', 'w') as f:
         writer = csv.writer(f)
         writer.writerows(zip(idx, sps))
-
-    # save cache to json
-    with open(f'./output/{save_name}_with_diversity_cache.json', 'w') as f:
-        json.dump(fitness_cache, f)
 
     return running_struct
 
@@ -345,16 +292,24 @@ def generate_inputs():
 if __name__ == '__main__':
     inputs = generate_inputs()
 
-
-    if args.search_structure == 'tree':
+    # preprocess search space structure
+    if args.search_structure == 'linear':
+        structure = LinearStructure
+    elif args.search_structure == 'tree':
         structure = TreeStructure
+    elif args.search_structure == 'graph':
+        structure = GraphStructure
     else:
         raise NotImplementedError(
             f'Not support {args.search_structure} structure.')
 
     logger.info('Begin Evolution Search...')
-    evolution_search(inputs, structure, args.iterations, args.popu_size)
+    evolution_search(structure, inputs, args.iterations, args.popu_size)
 
-    # save mem_dict to json
-    with open('mem_dict.json', 'w') as f:
+    # save the memory to file
+    if not os.path.exists(f'./output/memory'):
+        os.makedirs(f'./output/memory')
+
+    exp_name = os.path.basename(args.log_path).split('.')[0]
+    with open(f'./output/memory/mem_dict_{exp_name}.json', 'w') as f:
         json.dump(mem_dict, f)
