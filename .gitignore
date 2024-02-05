@@ -7,3 +7,4 @@ output/*
 *.png
 pretrained_ckpt/*
 dataset/*
+lpzero.egg-info/*

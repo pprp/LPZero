@@ -1,6 +1,6 @@
 datasets
 deap
-fairseq
+# fairseq
 hyperopt
 ipywidgets
 lightgbm
@@ -11,5 +11,5 @@ scipy
 seaborn
 tensorflow>=2.9.1
 thop
-torch
+# torch
 transformers

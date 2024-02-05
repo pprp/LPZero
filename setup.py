@@ -84,7 +84,7 @@ def parse_requirements(fname='requirements.txt', with_version=True):
 
 if __name__ == '__main__':
     setup(
-        name='plzero',
+        name='lpzero',
         version='0.1',
         description='library for pprp',
         long_description=readme(),

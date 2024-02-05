@@ -60,7 +60,7 @@ def load_all():
     from .zc_inputs import compute_gradient  # noqa: F401
     from .zc_inputs import compute_head  # noqa: F401
     from .zc_inputs import compute_jacobs  # noqa: F401
-    from .zc_inputs import compute_softmax  # noqa: F401
+    # from .zc_inputs import compute_softmax  # noqa: F401
     from .zc_inputs import compute_weight  # noqa: F401
 
 
