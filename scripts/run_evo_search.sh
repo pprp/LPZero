@@ -28,43 +28,42 @@
     # \
     # > ./logs/evo_search_${STRUCTURE}_run0.log 2>&1 &
 
-NUM_SAMPLE=5
-CUDA_VISIBLE_DEVICES=0 python lpzero/runner/evo_search.py
-    # --log_path ./logs/evo_search_cci_diversity_refactor_new_run0.log \
-#     > logs/evo_search_cci_diversity_refactor_new_run0.log
-    # 2>&1 &
+# NUM_SAMPLE=100
+# CUDA_VISIBLE_DEVICES=0 python lpzero/runner/evo_search.py \
+#     --log_path ./logs/evo_search_new_run0.log &
 
-# NUM_SAMPLE=50
+# NUM_SAMPLE=100
 # CUDA_VISIBLE_DEVICES=1 python lpzero/runner/evo_search.py \
-#     --log_path ./logs/evo_search_cci_diversity_refactor_new_run1.log \
-#     > logs/evo_search_cci_diversity_refactor_new_run1.log 2>&1 &
+#     --log_path ./logs/evo_search_new_run1.log &
 
-# NUM_SAMPLE=50
+# NUM_SAMPLE=100
 # CUDA_VISIBLE_DEVICES=2 python lpzero/runner/evo_search.py \
-#     --log_path ./logs/evo_search_cci_diversity_refactor_new_run2.log \
-#     > logs/evo_search_cci_diversity_refactor_new_run2.log 2>&1 &
+#     --log_path ./logs/evo_search_new_run2.log &
 
-# NUM_SAMPLE=50
+# NUM_SAMPLE=100
 # CUDA_VISIBLE_DEVICES=3 python lpzero/runner/evo_search.py \
-#     --log_path ./logs/evo_search_cci_diversity_refactor_new_run6.log \
-#    > logs/evo_search_cci_diversity_refactor_new_run6.log 2>&1 &
+#     --log_path ./logs/evo_search_new_run6.log &
 
-# NUM_SAMPLE=50
+# NUM_SAMPLE=100
 # CUDA_VISIBLE_DEVICES=4 python lpzero/runner/evo_search.py \
-#     --log_path ./logs/evo_search_cci_diversity_refactor_new_run7.log \
-#     > logs/evo_search_cci_diversity_refactor_new_run7.log 2>&1 &
+#     --log_path ./logs/evo_search_new_run7.log &
 
-# NUM_SAMPLE=50
+# NUM_SAMPLE=100
 # CUDA_VISIBLE_DEVICES=5 python lpzero/runner/evo_search.py \
-#     --log_path ./logs/evo_search_cci_diversity_refactor_new_run8.log \
-#     > logs/evo_search_cci_diversity_refactor_new_run8.log 2>&1 &
+#     --log_path ./logs/evo_search_new_run8.log &
 
-# NUM_SAMPLE=50
+# NUM_SAMPLE=100
 # CUDA_VISIBLE_DEVICES=6 python lpzero/runner/evo_search.py \
-#     --log_path ./logs/evo_search_cci_diversity_refactor_new_run9.log \
-#     > logs/evo_search_cci_diversity_refactor_new_run9.log 2>&1 &
+#     --log_path ./logs/evo_search_new_run9.log &
 
-# NUM_SAMPLE=50
+# NUM_SAMPLE=100
 # CUDA_VISIBLE_DEVICES=7 python lpzero/runner/evo_search.py \
-#     --log_path ./logs/evo_search_cci_diversity_refactor_new_run10.log \
-#     > logs/evo_search_cci_diversity_refactor_new_run10.log 2>&1 &
+#     --log_path ./logs/evo_search_new_run10.log &
+
+NUM_SAMPLE=500
+CUDA_VISIBLE_DEVICES=7 python lpzero/runner/evo_search.py \
+    --log_path ./logs/evo_search_new_run10.log &
+
+NUM_SAMPLE=500
+CUDA_VISIBLE_DEVICES=6 python lpzero/runner/evo_search.py \
+    --log_path ./logs/evo_search_new_run10.log &

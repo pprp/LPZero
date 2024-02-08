@@ -5,21 +5,23 @@ import pandas as pd
 import seaborn as sns
 from matplotlib.ticker import ScalarFormatter
 from scipy.stats import kendalltau
+import matplotlib.colors as mcolors
 
 from lpzero.utils.rank_consistency import spearman
 
 # Set global plot configurations
-mpl.rcParams['figure.figsize'] = [13, 10]
+mpl.rcParams['figure.figsize'] = [13, 6]
 mpl.rcParams.update({'font.size': 13})
 mpl.rc('xtick', labelsize=13)
 mpl.rc('ytick', labelsize=13)
 
+IS_RANK=True
 
 def plot_correlations_from_csv(csv_file_path):
     # Read the CSV data into a DataFrame
     df = pd.read_csv(csv_file_path)
 
-    fig, axs = plt.subplots(3, 3)
+    fig, axs = plt.subplots(2, 4)
     fig.tight_layout(h_pad=2.5, w_pad=3)
 
     # Define the headers and corresponding column names in the DataFrame
@@ -27,7 +29,7 @@ def plot_correlations_from_csv(csv_file_path):
         ('Synaptic Diversity', 'Synaptic Diversity'),
         ('Synaptic Saliency', 'Synaptic Saliency'),
         ('Activation Distance', 'Activation Distance'),
-        ('Jacobian Score', 'Jacobian Score'),
+        # ('Jacobian Score', 'Jacobian Score'),
         ('Head Importance', 'Head Importance'),
         ('Head Confidence', 'Head Confidence'),
         ('Head Softmax Confidence', 'Head Softmax Confidence'),
@@ -38,25 +40,25 @@ def plot_correlations_from_csv(csv_file_path):
     # Get list of titles from headers
     titles = [header for header, _ in headers]
 
-    for i in range(1, len(headers) + 1):
-        column_name = headers[i - 1][1]
+    for i in range(len(headers)):
+        column_name = headers[i][1]
         data_list = df[column_name].replace([np.inf, -np.inf], np.nan).dropna()
         gt_list = df['GLUE Score'].loc[data_list.index]
+        
+        if IS_RANK:
+            data_list = data_list.rank()
+            gt_list = gt_list.rank()
 
-        # Set color palette based on the index
-        cmap = sns.color_palette('viridis', as_cmap=True)
-        if i == 1:
-            cmap = sns.color_palette('BuGn', as_cmap=True)
-        elif i == 3:
-            cmap = sns.color_palette('GnBu', as_cmap=True)
-        elif i == 5:
-            cmap = sns.color_palette('OrRd', as_cmap=True)
-        elif i == 7:
-            cmap = sns.color_palette('RdPu', as_cmap=True)
-        elif i == 9:
-            cmap = sns.color_palette('RdPu', as_cmap=True)
-
-        subplot = axs[(i - 1) // 3, (i - 1) % 3]
+        norm = plt.Normalize(data_list.min(), data_list.max())
+        if not IS_RANK:
+            cmap = sns.color_palette('viridis')
+        else:
+            cmap = sns.color_palette('rocket_r')
+        
+        cmap = mcolors.ListedColormap(cmap)
+            
+        # subplot = axs[(i - 1) // 3, (i - 1) % 3]
+        subplot = axs.flatten()[i]
         subplot.yaxis.set_major_formatter(ScalarFormatter())
 
         tau, _ = kendalltau(gt_list, data_list)
@@ -68,11 +70,14 @@ def plot_correlations_from_csv(csv_file_path):
         # Create the scatter plot directly with matplotlib to avoid conflicts
         subplot.grid(True, linestyle='--', which='major',
                      color='grey', alpha=0.25)
+        
+        data_list_normalized = (data_list - data_list.min()) / (data_list.max() - data_list.min())
+        colors = cmap(data_list_normalized)
+        
         subplot.scatter(
             gt_list,
             data_list,
-            c=data_list,
-            cmap=cmap,
+            c=colors,
             s=18,
             edgecolor='black',
             linewidth=0.5,
@@ -91,12 +96,11 @@ def plot_correlations_from_csv(csv_file_path):
         fig.colorbar(sm, ax=subplot, fraction=0.046, pad=0.05)
 
     # Hide any unused subplots
-    for j in range(i, 2 * 4):
-        fig.delaxes(axs.flatten()[j])
+    # for j in range(i, 2 * 4):
+    #     fig.delaxes(axs.flatten()[j])
 
-    plt.show()
-    plt.savefig('combined_correlation.png')
+    plt.savefig('combined_rank_correlation_3.png', dpi=300, bbox_inches='tight')
 
 
 # Call the function with the path to your CSV file
-plot_correlations_from_csv('./BERT_results_activation_2.csv')
+plot_correlations_from_csv('./BERT_results_activation_3.csv')

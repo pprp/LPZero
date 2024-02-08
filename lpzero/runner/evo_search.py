@@ -87,6 +87,8 @@ def parse_args():
 
 args = parse_args()
 
+print(f"LOG SAVE PATH: {args.log_path}")
+
 logger.add(
     args.log_path,
     format='{time:YYYY-MM-DD HH:mm:ss} | {level} | {module}:{function}:{line} - {message}',
@@ -189,6 +191,7 @@ def evolution_search(structure, inputs, iterations=1000, popu_size=50):
         if is_anomaly(score):
             continue
         logger.info(f'Current population size: {len(population)}')
+        logger.info(f'Current structure: {struct} with score: {score}')
         population.append(struct)
 
     # prepare data for matplotlib plot
@@ -206,9 +209,8 @@ def evolution_search(structure, inputs, iterations=1000, popu_size=50):
         # best structure on the run
         running_struct = population[argidxs[0]]
         logger.info(
-            f'Iter: {i} Best SP: {scores[argidxs[0]]} Struct={running_struct} Input={running_struct.genotype["input_geno"]} Op={running_struct.genotype["op_geno"]}'
+            f'===> Iter: {i} Best SP: {scores[argidxs[0]]} Best Struct={running_struct} Input={running_struct.genotype["input_geno"]} Op={running_struct.genotype["op_geno"]}'
         )
-
         # add data for matplotlib plot
         idx.append(i)
         sps.append(scores[argidxs[0]])
@@ -230,6 +232,10 @@ def evolution_search(structure, inputs, iterations=1000, popu_size=50):
         del population[argidxs[-1]]
 
         population.append(offspring_struct)
+        score = fitness_spearman(offspring_struct, inputs)
+        logger.info(
+            f'Iter: {i} Offspring SP: {score} Offspring Struct={offspring_struct} Input={offspring_struct.genotype["input_geno"]} Op={offspring_struct.genotype["op_geno"]}'
+        )
 
         # 6. assert the population size should not shrink
         assert len(
@@ -240,7 +246,7 @@ def evolution_search(structure, inputs, iterations=1000, popu_size=50):
     argidxs = np.argsort(scores)[::-1]
     running_struct = population[argidxs[0]]
     logger.info(
-        f'After {iterations} iters: Best SP:{scores[argidxs[0]]} Struct={running_struct} Input={running_struct.genotype["input_geno"]} Op={running_struct.genotype["op_geno"]}'
+        f'====> After {iterations} iters: Best SP:{scores[argidxs[0]]} Struct={running_struct} Input={running_struct.genotype["input_geno"]} Op={running_struct.genotype["op_geno"]}'
     )
 
     # plot the evolution process

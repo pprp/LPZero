@@ -24,6 +24,41 @@ with open('./data/BERT_benchmark.json', 'r') as f:
 args = parse_args()
 
 
+def find_best(inputs, structure, device=None, num_sample=500):
+    """structure is belong to popultion."""
+    device = device or torch.device(
+        'cuda' if torch.cuda.is_available() else 'cpu')
+    
+    best_gt = -1 
+    best_zc = -1
+    best_nas_config = None
+    best_scores = None 
+    
+    for i in tqdm(range(num_sample)):
+        nas_config = configs[i]['hparams']['model_hparam_overrides']['nas_config']
+
+        gt = configs[i]['scores']['glue']
+        _score = configs[i]['scores']
+        
+        # build a new model
+        config = ElectraConfig(
+            nas_config=nas_config,
+            num_hidden_layers=len(nas_config['encoder_layers']),
+            output_hidden_states=True,
+        )
+        model = ElectraModel(config)
+        model.to(device)
+        inputs.to(device)
+        zc = structure(inputs, model)
+        
+        if best_zc < zc:
+            best_zc = zc
+            best_gt = gt
+            best_nas_config = nas_config
+            best_scores = _score
+    
+    return best_gt, best_nas_config, best_scores
+        
 def fitness_spearman(inputs, structure, device=None, num_sample=500):
     """structure is belong to popultion."""
     device = device or torch.device(
@@ -73,7 +108,6 @@ def fitness_spearman(inputs, structure, device=None, num_sample=500):
             return -1
     except TypeError as e:
         import pdb
-
         pdb.set_trace()
 
     df['lpzero'] = zc_score
@@ -85,7 +119,6 @@ def fitness_spearman(inputs, structure, device=None, num_sample=500):
     # gc.collect()
 
     sp = spearman(gt_score, zc_score)
-    kd = kendalltau(gt_score, zc_score)
     if structure.sp_score == -1:
         structure.sp_score = sp
 
@@ -104,7 +137,7 @@ def fitness_spearman(inputs, structure, device=None, num_sample=500):
     plt.ylabel('Zero Cost (LPZero)')
     plt.title(f'Spearman Correlation: {sp}')
     plt.savefig(f'./output/{structure}_500.png')
-    return sp, kd
+    return sp
 
 
 if __name__ == '__main__':
@@ -159,6 +192,9 @@ if __name__ == '__main__':
     # TREE:(to_std_scalar-element_wise_pow|normalize-sigmoid)
     # BINARY:(element_wise_product) Input=['head', 'act'] Op=[[18, 3], [5, 12], 2]
 
-    sp, kd = fitness_spearman(inputs, struct, num_sample=500)
-    print(f'Spearman of {struct} is {sp}')
-    print(f'Kendalltau of {struct} is {kd}')
+    # sp = fitness_spearman(inputs, struct, num_sample=500)
+    gt, nas_config, best_score = find_best(inputs, struct)
+
+    print(f'Ground Truth: {gt}')
+    print(f'NAS Config: {nas_config}')
+    print(f'Best Score: {best_score}')
