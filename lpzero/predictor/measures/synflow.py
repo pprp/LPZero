@@ -27,11 +27,11 @@ from typing import Optional
 from scipy.stats import spearmanr
 import matplotlib.pyplot as plt
 
-from archai.nlp.models.model_loader import load_model_from_config
+from lpzero.model.model_loader import load_model_from_config
 from archai.nlp.nas.zero_cost_utils.flops import get_model_flops
 from archai.nlp.datasets.lm_iterators import LMOrderedIterator
-from archai.nlp.models.mem_transformer.model_mem_transformer import MemTransformerLM
-from archai.nlp.models.hf_gpt2.model_hf_gpt2 import HfGPT2Flex
+from lpzero.model.mem_transformer.model_mem_transformer import MemTransformerLM
+from lpzero.model.hf_gpt2.model_hf_gpt2 import HfGPT2Flex
 
 
 # TODO: handle layerNorm

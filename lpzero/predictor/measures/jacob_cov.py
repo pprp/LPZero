@@ -20,8 +20,8 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 
-from archai.nlp.models.mem_transformer.model_mem_transformer import MemTransformerLM
-from archai.nlp.models.hf_gpt2.model_hf_gpt2 import HfGPT2Flex
+from lpzero.model.mem_transformer.model_mem_transformer import MemTransformerLM
+from lpzero.model.hf_gpt2.model_hf_gpt2 import HfGPT2Flex
 
 from . import measure
 
