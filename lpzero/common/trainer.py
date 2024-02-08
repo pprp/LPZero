@@ -16,7 +16,7 @@ from lpzero.common.tester import Tester
 from lpzero.common.config import Config
 from lpzero.common import utils, ml_utils
 from lpzero.common.common import logger
-from archai.datasets import data
+from lpzero.datasets import data 
 from lpzero.common.checkpoint import CheckPoint
 from lpzero.common.apex_utils import ApexUtils
 from lpzero.common.multi_optim import MultiOptim, OptimSched
