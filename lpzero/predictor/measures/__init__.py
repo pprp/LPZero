@@ -1,6 +1,4 @@
 
-
-
 available_measures = []
 _measure_impls = {}
 
