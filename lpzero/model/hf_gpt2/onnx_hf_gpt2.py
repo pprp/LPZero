@@ -6,8 +6,6 @@
 
 from typing import Any, Dict
 
-from onnxruntime.transformers.onnx_model_gpt2 import Gpt2OnnxModel as HfGPT2OnnxModel
-
 from lpzero.model.config_base import OnnxConfigWithPast
 
 

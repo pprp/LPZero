@@ -8,14 +8,10 @@ from typing import Any, Callable, Dict, Optional, Tuple
 
 import torch
 
-from onnxruntime.transformers.onnx_model import OnnxModel
-
 from lpzero.model.config_base import Config, OnnxConfig, SearchConfig
 from lpzero.model.model_base import ArchaiModel
 from lpzero.model.model_dict import (MODELS, MODELS_CONFIGS,
-                                          MODELS_SEARCH_CONFIGS, MODELS_PARAMS_FORMULAE,
-                                          ONNX_MODELS, ONNX_MODELS_CONFIGS)
-
+                                          MODELS_SEARCH_CONFIGS, MODELS_PARAMS_FORMULAE)
 
 def load_model_formula(model_type: str) -> Callable:
     """Loads an available analytical parameters formula.
@@ -124,23 +120,6 @@ def load_search_config(model_type: str) -> SearchConfig:
         raise Exception(f'model_type: {model_type} not supported yet.')
 
     return MODELS_SEARCH_CONFIGS[model_type]()
-
-
-def load_onnx_model(model_type: str, *model_args) -> OnnxModel:
-    """Loads an available ONNX-based model (used during export optimization).
-
-    Args:
-        model_type: Type of the model.
-
-    Returns:
-        (OnnxModel): ONNX-based optimization model.
-
-    """
-
-    if model_type not in ONNX_MODELS.keys():
-        raise Exception(f'model_type: {model_type} not supported yet.')
-
-    return ONNX_MODELS[model_type](*model_args)
 
 
 def load_onnx_config(model_type: str, model_config: Dict[str, Any]) -> OnnxConfig:

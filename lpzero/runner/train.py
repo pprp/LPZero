@@ -879,6 +879,7 @@ def create_or_load_model(args, device, ntokens)->Tuple[ArchaiModel, dict]:
     else:
         model = load_model_from_config(args.model_type, model_config)
 
+
     n_params = model.get_params()
     n_all_param = n_params['total']
     n_nonemb_param = n_params['non_embedding']

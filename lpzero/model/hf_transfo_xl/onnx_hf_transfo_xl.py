@@ -7,7 +7,6 @@
 from typing import Any, Dict
 
 from lpzero.model.config_base import OnnxConfig
-from lpzero.model.mem_transformer.onnx_mem_transformer import MemTransformerLMOnnxModel as HfTransfoXLOnnxModel
 
 
 class HfTransfoXLOnnxConfig(OnnxConfig):

@@ -426,6 +426,7 @@ def create_or_load_model(args, device, ntokens)->Tuple[ArchaiModel, dict]:
 
 def main(): 
     args, device = init()
+
     # load tokenizer and datasets
     vocab, train_itr, valid_itr, test_itr, file_stats = load_data(args, device)
 
@@ -433,8 +434,9 @@ def main():
     ntokens = len(vocab)
     model, model_config = create_or_load_model(args, device, ntokens)
 
-    # test forward
-    inputs = generate_inputs()
+    model = model.to(device)
+
+
 
     # build dataloader using lm1b
     corpus = get_lm_corpus(
