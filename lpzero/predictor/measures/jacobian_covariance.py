@@ -1,6 +1,7 @@
 import numpy as np
 import torch
 from sklearn.metrics import pairwise_distances
+from . import measure
 
 
 # Covariance calculations for Jacobian covariance and variations

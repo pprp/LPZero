@@ -8,3 +8,5 @@ output/*
 pretrained_ckpt/*
 dataset/*
 lpzero.egg-info/*
+data/wikitext/*
+data/cachedir/*

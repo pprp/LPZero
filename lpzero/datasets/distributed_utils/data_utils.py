@@ -47,8 +47,6 @@ def tokenize_raw(text, lang='en'):
 
 
 if __name__ == '__main__':
-    # test code
-
     import argparse
     parser = argparse.ArgumentParser(description='unit test')
     parser.add_argument('--datadir', type=str, default='../data/text8',

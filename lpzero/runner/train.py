@@ -325,10 +325,6 @@ def save_checkpoint(args, model, model_config, optimizer, scheduler, scaler,
     else:
         amp_state = None
 
-    # We never save MixedQAT wrapper, instead we save the fp32 regular model
-    if isinstance(model, MixedQATModel):
-        model = model.model
-
     state = {
         'args': args,
         'model_config': model_config,
@@ -882,9 +878,6 @@ def create_or_load_model(args, device, ntokens)->Tuple[ArchaiModel, dict]:
         model, model_config, _ = load_model_from_checkpoint(args.model_type, args.pretrained_path, on_cpu=False)
     else:
         model = load_model_from_config(args.model_type, model_config)
-
-    if args.mixed_qat:
-        model = MixedQATModel(model)
 
     n_params = model.get_params()
     n_all_param = n_params['total']

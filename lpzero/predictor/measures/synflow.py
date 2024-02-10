@@ -33,10 +33,6 @@ from lpzero.datasets.lm_iterators import LMOrderedIterator
 from lpzero.model.mem_transformer.model_mem_transformer import MemTransformerLM
 from lpzero.model.hf_gpt2.model_hf_gpt2 import HfGPT2Flex
 
-
-# TODO: handle layerNorm
-
-
 def get_layer_metric_array(net, metric):
     metric_array = []
 

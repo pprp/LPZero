@@ -17,7 +17,7 @@ import torch
 
 from . import measure
 from ..p_utils import get_layer_metric_array
-
+from lpzero.model.flexibert.modeling_electra import ElectraModel
 
 @measure("grad_norm", bn=True)
 def get_grad_norm_arr(net, inputs, targets, loss_fn, split_data=1, skip_grad=False):
@@ -30,9 +30,13 @@ def get_grad_norm_arr(net, inputs, targets, loss_fn, split_data=1, skip_grad=Fal
         st = sp * N // split_data
         en = (sp + 1) * N // split_data
 
-        loss, _, _, _ = net.forward(inputs[st:en, :], targets[st:en, :], mems=None)
-        loss = loss.float().mean().type_as(loss)
-        loss.backward()
+        if isinstance(net, ElectraModel):
+            output = net(inputs).last_hidden_state 
+            output.backward(torch.ones_like(output))
+        else: # GPT-2
+            loss, _, _, _ = net.forward(inputs[st:en, :], targets[st:en, :], mems=None)
+            loss = loss.float().mean().type_as(loss)
+            loss.backward()
 
         grad_norm_arr = get_layer_metric_array(
             net,

@@ -1,6 +1,7 @@
 import torch
 
 from lpzero.utils.modeling_electra import ElectraLayer
+from . import measure
 
 
 # Synaptic Diversity metric
