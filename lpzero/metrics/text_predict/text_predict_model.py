@@ -13,8 +13,8 @@ import onnxruntime as ort
 import torch
 from transformers import AutoConfig
 
-from archai.common.lru_cache import LRUCache
-from archai.nlp.models.model_loader import load_model_from_checkpoint
+from lpzero.common.lru_cache import LRUCache
+from lpzero.model.model_loader import load_model_from_checkpoint
 
 
 class TextPredictModel:

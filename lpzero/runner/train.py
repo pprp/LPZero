@@ -25,22 +25,21 @@ import torch
 import torch.nn as nn
 import torch.optim as optim
 import yaml
-from archai.common import ml_perf_utils, utils
-from archai.nlp.models.model_mixed_qat import MixedQATModel
-from archai.nlp.compression.quantization.ptq import dynamic_quantization_torch_from_model
-from archai.nlp.models.model_loader import (load_model_from_config,
+from lpzero.common import ml_perf_utils, utils
+# from lpzero.model.model_mixed_qat import MixedQATModel
+from lpzero.model.model_loader import (load_model_from_config,
                                            load_model_from_checkpoint)
-from archai.nlp.compression.quantization.qat import (prepare_with_qat,
-                                                     qat_to_float_modules)
-from archai.nlp.datasets import exp_utils
-from archai.nlp.datasets.distributed_utils import distributed as nv_distributed
-from archai.nlp.datasets.distributed_utils.data_parallel import BalancedDataParallel
-from archai.nlp.datasets.distributed_utils.data_utils import get_lm_corpus
-from archai.nlp.datasets.exp_utils import (AverageMeter, create_exp_dir, l2_promote,
+# from archai.nlp.compression.quantization.qat import (prepare_with_qat,
+#                                                      qat_to_float_modules)
+from lpzero.datasets import exp_utils
+from lpzero.datasets.distributed_utils import distributed as nv_distributed
+from lpzero.datasets.distributed_utils.data_parallel import BalancedDataParallel
+from lpzero.datasets.distributed_utils.data_utils import get_lm_corpus
+from lpzero.datasets.exp_utils import (AverageMeter, create_exp_dir, l2_promote,
                                            log_env_info)
-from archai.nlp.models.model_base import ArchaiModel
-from archai.nlp.models.model_utils import lamb_optimizer
-from archai.nlp.models.model_utils.cyclic_cosine_scheduler import CyclicCosineDecayLR
+from lpzero.model.model_base import ArchaiModel
+from lpzero.model.model_utils import lamb_optimizer
+from lpzero.model.model_utils.cyclic_cosine_scheduler import CyclicCosineDecayLR
 from torch.nn.parallel import DistributedDataParallel
 
 
@@ -65,7 +64,7 @@ def parse_args():
     config_args, _ = cfg_parser.parse_known_args()
 
     if config_args.config is not None and config_args.config_file is not None:
-        config_file_path = utils.full_path(os.path.join('.', 'archai', 'nlp', config_args.config_file))
+        config_file_path = utils.full_path(os.path.join('.', 'nlp_logs', config_args.config_file))
         with open(config_file_path) as f:
             config = yaml.load(f, Loader=yaml.FullLoader)[config_args.config]['train']
     else:
@@ -684,12 +683,12 @@ def train(train_itr, valid_itr, model, para_model, model_config, optimizer,
             model_to_save = model
             prefix = ''
 
-            if args.qat:
-                # Convert the model to a regular FP32 model for saving
-                model_float = copy.deepcopy(model)
-                model_float = qat_to_float_modules(model_float)
-                model_to_save = model_float
-                prefix = 'qat_'
+            # if args.qat:
+            #     # Convert the model to a regular FP32 model for saving
+            #     model_float = copy.deepcopy(model)
+            #     model_float = qat_to_float_modules(model_float)
+            #     model_to_save = model_float
+            #     prefix = 'qat_'
 
             save_checkpoint(args, model_to_save, model_config, optimizer, scheduler,
                             scaler, vocab, epoch, batch, last_iter,
@@ -875,8 +874,8 @@ def create_or_load_model(args, device, ntokens)->Tuple[ArchaiModel, dict]:
     if args.qat and not args.pretrained_path:
         logging.warning('QAT usually starts from a pretrained model. Check the --pretrained_path argument.')
 
-    if args.qat and args.mixed_qat:
-        raise ValueError('QAT and Mixed QAT cannot be used at the same time.')
+    # if args.qat and args.mixed_qat:
+    #     raise ValueError('QAT and Mixed QAT cannot be used at the same time.')
 
     if args.pretrained_path:
         logging.info('Overwriting the provided model config with the pretrained model config.')
@@ -893,8 +892,8 @@ def create_or_load_model(args, device, ntokens)->Tuple[ArchaiModel, dict]:
     logging.info('#params = {}'.format(n_all_param))
     logging.info('#non emb params = {}'.format(n_nonemb_param))
 
-    if args.qat:
-        model = prepare_with_qat(model, onnx_compatible=True)
+    # if args.qat:
+    #     model = prepare_with_qat(model, onnx_compatible=True)
 
     return model, model_config
 
@@ -1106,13 +1105,13 @@ def train_main(args, device, train_itr, valid_itr, model, para_model, model_conf
                 logging.info('End of training')
                 break
 
-        if args.dynamic_quantization:
-            dynamic_quantization_torch_from_model(model.cpu())
+        # if args.dynamic_quantization:
+        #     dynamic_quantization_torch_from_model(model.cpu())
 
-            save_checkpoint(args, model, model_config, optimizer, scheduler,
-                            scaler, vocab, epoch, last_batch, last_iter,
-                            train_step, best_val_loss, False,
-                            args.work_dir, prefix='qnt-')
+        #     save_checkpoint(args, model, model_config, optimizer, scheduler,
+        #                     scaler, vocab, epoch, last_batch, last_iter,
+        #                     train_step, best_val_loss, False,
+        #                     args.work_dir, prefix='qnt-')
 
     except KeyboardInterrupt:
         logging.info('-' * 100)
@@ -1283,7 +1282,7 @@ def main():
 
         # QAT-based arguments
         args.restart = None
-        args.qat = True
+        args.qat = False
         args.max_step = 10000
         args.lr = args.lr / 100
         args.eta_min = args.eta_min / 100

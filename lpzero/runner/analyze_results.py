@@ -96,7 +96,7 @@ def get_parser():
     parser.add_argument(
         "--results_dir",
         type=str,
-        default="./archai/nlp/nas/saved_logs",
+        default="./nlp_logs/saved_logs",
         help="path where experiment logs are stored",
     )
     parser.add_argument("--exp_name", type=str, help="name of maulet experiment")

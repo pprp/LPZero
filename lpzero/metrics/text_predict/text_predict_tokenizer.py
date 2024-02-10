@@ -11,7 +11,7 @@ from typing import List, Optional, Set, Tuple
 import numpy as np
 from transformers import PreTrainedTokenizerFast
 
-from archai.common.lru_cache import LRUCache
+from lpzero.common.lru_cache import LRUCache
 
 # Token-related constants
 TOKENIZER_FILTER_TOKEN_IDS_CACHE_SIZE = 65536
