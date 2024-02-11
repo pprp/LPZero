@@ -6,6 +6,7 @@ import os
 import math
 import random
 from typing import Union
+import collections
 
 import re 
 import yaml
@@ -37,15 +38,30 @@ with open("saved_logs/random_GPT2_wt103/config_0/j2/model_config.yaml", "r") as 
     model_config = yaml.load(f, Loader=yaml.FullLoader)
 
 
+def get_batch_data(train_iter, num_batches=5):
+    traindata = []
+    max_seq_length = 1024  # GPT-2's maximum input sequence length
+
+    for batch, (data, target, _, _) in enumerate(train_iter, start=1):
+        if batch > num_batches:
+            break
+        
+        # Ensure each input sequence in the batch does not exceed the max_seq_length
+        if data.size(1) > max_seq_length:
+            data = data[:, :max_seq_length]
+            target = target[:, :max_seq_length]
+
+        traindata.append((data, target))
+
+    inputs = torch.cat([a for a, _ in traindata], dim=-1)
+    targets = torch.cat([b for _, b in traindata], dim=-1)
+    return inputs, targets 
+
+
 def parse_args():
     parser = argparse.ArgumentParser(
         description='running parameters',
         formatter_class=argparse.ArgumentDefaultsHelpFormatter,
-    )
-
-    # general parameters for data and qnn
-    parser.add_argument(
-        '--seed', default=42, type=int, help='random seed for results reproduction'
     )
     parser.add_argument(
         '--step', default=20, type=int, help='record snn output per step'
@@ -128,11 +144,26 @@ def all_same(items):
     return all(x == items[0] for x in items)
 
 
-def get_scores(args, exp_name, tr_iter, method="lpzero", compute_cost=False, structure=None):
-    path_to_results = exp_name
+def convert_path_to_config_format(path: str) -> str:
+    # Split the path into parts
+    parts = path.split('/')
     
-    scores = {}
-    costs = {}
+    # Extract the relevant parts (config_xx and jy)
+    config_part = parts[-3]  # This gets 'config_xx'
+    j_part = parts[-2]      # This gets 'jy'
+    
+    # Combine them into the desired format
+    formatted_string = f"{config_part}_{j_part}"
+    
+    return formatted_string
+
+
+def get_scores(structure, tr_iter=None):
+    assert structure is not None, "structure is not defined"
+    path_to_results = './saved_logs/random_GPT2_wt103'
+    
+    inputs, targets = get_batch_data(tr_iter, num_batches=5)
+    
     files = []
     dirlist = [path_to_results]
     while len(dirlist) > 0:
@@ -140,42 +171,34 @@ def get_scores(args, exp_name, tr_iter, method="lpzero", compute_cost=False, str
             dirlist.extend([os.path.join(dirpath, d) for d in dirnames])
             files.extend(map(lambda n: os.path.join(*n), zip([dirpath] * len(filenames), filenames),))
 
-    count = 1
-    yaml_file = os.path.join(path_to_results, f"{method}_scores_seed_{args.seed}.yaml")
-    cost_file = os.path.join(path_to_results, f"{method}_cost.yaml")
+    # load the ground-truth rankings
+    yaml_file = os.path.join(path_to_results, "ppl_summary.yaml")
+    with open(yaml_file, "r") as f:
+        results_gt = collections.OrderedDict(yaml.safe_load(f))
     
     gt_list = []
     zc_list = []
-    
-    if not os.path.exists(yaml_file) or (compute_cost and not os.path.exists(cost_file)):
-        # almost 200 architectures 
-        for _f in set(files):
-            if "model_config.yaml" in _f:
-                idx =  re.search('(config_[0-9]+)', _f).span()[0]
-                job = _f[idx:]
-                config_name = job.split('/')[0] + '_' + job.split('/')[1]
-                with open(_f, "r") as f:
-                    model_config = yaml.full_load(f)
-                
-                model = load_model_from_config(args.model_type, model_config)
-                model.n_token = model_config["n_token"]
-                # measures = predictive.find_measures(
-                #     args,
-                #     model,
-                #     tr_iter,
-                #     (args.dataload, args.dataload_info, args.n_token),
-                #     args.device,
-                #     measure_names=[method],
-                # )
-                # scores[config_name] = measures[method]
-                # replace to structure 
-                zc = structure(inputs, model)
-                gt_list.append(model_config['valid_ppl'])
-                zc_list.append(zc)
+        
+    # almost 200 architectures 
+    for _f in set(files):
+        if "model_config.yaml" in _f:
+            idx =  re.search('(config_[0-9]+)', _f).span()[0]
+            job = _f[idx:]
+            config_name = job.split('/')[0] + '_' + job.split('/')[1]
+            with open(_f, "r") as f:
+                model_config = yaml.full_load(f)
+            
+            model = load_model_from_config(args.model_type, model_config)
+            model.n_token = model_config["n_token"]
+                        
+            # replace to structure 
+            zc = structure(inputs, model)
+            gt_list.append(results_gt[convert_path_to_config_format(_f)]["valid_ppl"])
+            zc_list.append(zc)
     
     sp = spearman(gt_list, zc_list)
     kd = kendalltau(gt_list, zc_list)
-    return sp, kd
+    return sp
 
 
 def get_metrics(topk, sorted_ground_truth, sorted_target, val_ppl_list_gt, val_ppl_list_target):
@@ -222,70 +245,6 @@ def get_statistics(method, results_gt, scores, topk_list):
     return common_ratios, spr_ranks, kendall_ranks
 
 
-def fitness_spearman(structure, inputs, device=None, num_sample=50):
-    """structure is belong to popultion."""
-    if structure.sp_score != -1:
-        return structure.sp_score
-
-    device = device or torch.device(
-        'cuda' if torch.cuda.is_available() else 'cpu')
-
-    gt_score = []
-    zc_score = []
-
-    for i in range(num_sample):
-        nas_config = configs[i]['hparams']['model_hparam_overrides']['nas_config']
-
-        gt = configs[i]['scores']['glue']
-        # build a new model
-        config = ElectraConfig(
-            nas_config=nas_config,
-            num_hidden_layers=len(nas_config['encoder_layers']),
-            output_hidden_states=True,
-        )
-        model = ElectraModel(config)
-        model.to(device)
-        inputs.to(device)
-        zc = structure(inputs, model)
-
-        if is_anomaly(zc):
-            return -1
-
-        # early exit
-        if len(zc_score) > 3 and all_same(zc_score):
-            return -1
-
-        zc_score.append(zc)
-        gt_score.append(gt)
-
-        del model
-        if torch.cuda.is_available():
-            torch.cuda.empty_cache()
-
-        # gc.collect()
-
-    # TODO add inf check
-    try:
-        if len(zc_score) <= 1 or np.isnan(spearman(gt_score, zc_score)):
-            return -1
-    except TypeError as e:
-        import pdb
-
-        pdb.set_trace()
-
-    # release memory
-    del inputs
-    torch.cuda.empty_cache()
-    # gc.collect()
-
-    sp = spearman(gt_score, zc_score)
-    if structure.sp_score == -1:
-        structure.sp_score = sp
-
-    mem_dict[str(structure)] = [gt_score, zc_score, sp]
-    return sp
-
-
 def is_anomaly(zc_score: Union[torch.Tensor, float, int] = None) -> bool:
     """filter the score with -1,0,nan,inf"""
     if isinstance(zc_score, Tensor):
@@ -302,14 +261,14 @@ def is_anomaly(zc_score: Union[torch.Tensor, float, int] = None) -> bool:
     return False
 
 
-def evolution_search(structure, inputs, iterations=1000, popu_size=50):
+def evolution_search(structure, train_itr, iterations=1000, popu_size=50):
     # random initialize N structures for evolution
     population = []
     logger.info('Initialize population')
 
     while len(population) < popu_size:
         struct = structure()
-        score = fitness_spearman(struct, inputs)
+        score = get_scores(struct, train_itr)
         if is_anomaly(score):
             continue
         logger.info(f'Current population size: {len(population)}')
@@ -323,7 +282,7 @@ def evolution_search(structure, inputs, iterations=1000, popu_size=50):
     # run the cycle
     logger.info('Begin the evolution process...')
     for i in range(iterations):
-        scores = [fitness_spearman(struct, inputs) for struct in population]
+        scores = [get_scores(struct, train_itr) for struct in population]
         # select the best one from the population
         scores = np.array(scores)
         argidxs = np.argsort(scores)[::-1]
@@ -354,7 +313,7 @@ def evolution_search(structure, inputs, iterations=1000, popu_size=50):
         del population[argidxs[-1]]
 
         population.append(offspring_struct)
-        score = fitness_spearman(offspring_struct, inputs)
+        score = get_scores(offspring_struct, train_itr)
         logger.info(
             f'Iter: {i} Offspring SP: {score} Offspring Struct={offspring_struct} Input={offspring_struct.genotype["input_geno"]} Op={offspring_struct.genotype["op_geno"]}'
         )
@@ -364,7 +323,7 @@ def evolution_search(structure, inputs, iterations=1000, popu_size=50):
             population) == popu_size, f'Population size should be {popu_size}'
 
     # evaluate the fitness of all structures
-    scores = [fitness_spearman(s, inputs) for s in population]
+    scores = [get_scores(s, train_itr) for s in population]
     argidxs = np.argsort(scores)[::-1]
     running_struct = population[argidxs[0]]
     logger.info(
@@ -402,6 +361,9 @@ if __name__ == '__main__':
     elif args.dataset == "lm1b":
         eval_batch_size = 16
         eval_tgt_len = 32
+        
+    device = torch.device("cuda" if args.cuda else "cpu")
+
 
     data = './data/wikitext/wikitext-103'
     cache_dir = './data/cachedir'
@@ -409,7 +371,9 @@ if __name__ == '__main__':
     vocab_size = 50264 if 'gpt' in args.model_type else 267736
     corpus = get_lm_corpus(data, cache_dir, args.dataset, vocab, vocab_size, refresh_cache=False)
     train_itr = corpus.get_iterator("train", eval_batch_size, eval_tgt_len,
-                                    device=args.device, mem_len=0, ext_len=0)
+                                    device=device, mem_len=0, ext_len=0)
+    args.n_token = len(corpus.vocab)
+    
     if args.dataset != "lm1b":
         train_iter = train_itr.get_fixlen_iter(start=0)
     else:
