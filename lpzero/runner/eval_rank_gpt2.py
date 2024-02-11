@@ -353,7 +353,8 @@ if __name__ == "__main__":
     data = './data/wikitext/wikitext-103'
     cache_dir = './data/cachedir'
     vocab = 'gpt2' if 'gpt' in args.model_type else 'word'
-    vocab_size = 50257 if 'gpt' in args.model_type else 267736
+    vocab_size = 50264 if 'gpt' in args.model_type else 267736
+    
     corpus = get_lm_corpus(data, cache_dir, args.dataset, vocab, vocab_size, refresh_cache=False)
     train_itr = corpus.get_iterator("train", eval_batch_size, eval_tgt_len, device=args.device, mem_len=0, ext_len=0)
     args.n_token = len(corpus.vocab)

@@ -11,8 +11,6 @@ from lpzero.runner.eval_rank_gpt2 import parse_arguments
 with open("saved_logs/random_GPT2_wt103/config_0/j2/model_config.yaml", "r") as f:
     model_config = yaml.load(f, Loader=yaml.FullLoader)
 
-max_seq_length = 1024  # GPT-2's maximum input sequence length
-
 # build gpt2 model 
 model = load_model_from_config('hf_gpt2_flex', model_config)
 model.n_token = model_config['n_token']
@@ -48,9 +46,9 @@ for batch, (data, target, seq_len, _) in enumerate(train_iter, start=1):
         break
     
     # Ensure each input sequence in the batch does not exceed the max_seq_length
-    if data.size(1) > max_seq_length:
-        data = data[:, :max_seq_length]
-        target = target[:, :max_seq_length]
+    # if data.size(1) > max_seq_length:
+    #     data = data[:, :max_seq_length]
+    #     target = target[:, :max_seq_length]
 
     traindata.append((data, target))
 

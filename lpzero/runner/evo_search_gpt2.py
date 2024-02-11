@@ -17,10 +17,7 @@ from datasets import load_dataset
 from loguru import logger
 from torch import Tensor
 
-from lpzero.model.flexibert.modeling_electra import (
-    ElectraConfig,
-    ElectraModel,
-) 
+
 from lpzero.structures import GraphStructure, LinearStructure, TreeStructure
 from lpzero.utils.rank_consistency import spearman
 import numpy as np
@@ -33,22 +30,12 @@ from lpzero.datasets.distributed_utils.data_utils import get_lm_corpus
 # save memory to file    
 mem_dict = {}
 
-with open("saved_logs/random_GPT2_wt103/config_0/j2/model_config.yaml", "r") as f:
-    model_config = yaml.load(f, Loader=yaml.FullLoader)
-
-
 def get_batch_data(train_iter, num_batches=5):
     traindata = []
-    max_seq_length = 1024  # GPT-2's maximum input sequence length
 
     for batch, (data, target, _, _) in enumerate(train_iter, start=1):
         if batch > num_batches:
             break
-        
-        # Ensure each input sequence in the batch does not exceed the max_seq_length
-        if data.size(1) > max_seq_length:
-            data = data[:, :max_seq_length]
-            target = target[:, :max_seq_length]
 
         traindata.append((data, target))
 
@@ -346,10 +333,6 @@ def evolution_search(structure, train_itr, iterations=1000, popu_size=50):
 
 
 if __name__ == '__main__':
-
-    # build inputs for gpt2 
-    args = parse_args()
-
     if args.dataset == "wt103":
         eval_batch_size = 16
         eval_tgt_len = 192
@@ -358,7 +341,6 @@ if __name__ == '__main__':
         eval_tgt_len = 32
         
     device = torch.device("cuda" if args.cuda else "cpu")
-
 
     data = './data/wikitext/wikitext-103'
     cache_dir = './data/cachedir'

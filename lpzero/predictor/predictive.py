@@ -143,7 +143,10 @@ def find_measures(
         if isinstance(arr[0], (float, int)):
             return sum(arr)
         elif isinstance(arr[0], torch.Tensor):
-            return torch.sum(torch.stack(arr)).item()
+            _sum = 0.0
+            for i in range(len(arr)):
+                _sum += torch.sum(arr[i])
+            return _sum.item() 
         else:
             raise ValueError("Unsupported element type in the array")
 
