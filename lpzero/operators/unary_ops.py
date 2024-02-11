@@ -93,8 +93,8 @@ def element_wise_abs(A: ALLTYPE) -> ALLTYPE:
 
 
 def element_wise_sqrt(A: ALLTYPE) -> ALLTYPE:
-    A[A <= 0] = 0
-    return torch.sqrt(A)
+    A_clamped = A.clamp(min=0)
+    return torch.sqrt(A_clamped)
 
 
 def element_wise_pow(A: ALLTYPE) -> ALLTYPE:
