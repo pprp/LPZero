@@ -53,6 +53,7 @@ def compute_activation(model, inputs, targets=None, **kwargs) -> List:
         for layer in model.modules():
             if isinstance(layer, transformers.Conv1D) or isinstance(layer, nn.Linear):
                 layer.register_forward_hook(activation_hook)
+        model.forward(inputs, targets, mems=None)
         return act_outputs 
     else: 
         raise NotImplementedError(f"model type {type(model)} is not supported for activations")
@@ -88,6 +89,7 @@ def compute_head(model, inputs, targets=None, **kwargs) -> List:
         for layer in model.modules():
             if isinstance(layer, transformers.Conv1D) or isinstance(layer, nn.Linear):
                 layer.register_forward_hook(head_hook)
+        model.forward(inputs, targets, mems=None)
         return head_outputs
 
 

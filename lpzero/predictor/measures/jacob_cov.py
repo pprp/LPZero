@@ -234,7 +234,11 @@ def modify_net(net):
         net.model.lm_head.forward = types.MethodType(forward_crit, net.model.lm_head)
     else:
         raise NotImplementedError
-    net.fc_to_1class = torch.nn.Linear(net.n_token, 1, bias=False)
+
+    if hasattr(net, 'n_token'):
+        net.fc_to_1class = torch.nn.Linear(net.n_token, 1, bias=False)
+    else:
+        net.fc_to_1class = torch.nn.Linear(net.config.n_token, 1, bias=False)
     return net
 
 
