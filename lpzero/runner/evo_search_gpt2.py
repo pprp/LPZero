@@ -3,8 +3,6 @@ import csv
 import json
 import os 
 
-# build logger
-import logging
 import math
 import random
 from typing import Union
@@ -30,10 +28,6 @@ from scipy.stats import spearmanr
 from lpzero.model.model_loader import load_model_from_config
 
 from lpzero.utils.rank_consistency import kendalltau
-
-configs = []
-with open('./data/BERT_benchmark.json', 'r') as f:
-    configs = json.load(f)
 
 # save memory to file    
 mem_dict = {}
