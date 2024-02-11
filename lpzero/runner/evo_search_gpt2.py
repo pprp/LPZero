@@ -28,9 +28,13 @@ from scipy.stats import spearmanr
 from lpzero.model.model_loader import load_model_from_config
 
 from lpzero.utils.rank_consistency import kendalltau
+from lpzero.datasets.distributed_utils.data_utils import get_lm_corpus
 
 # save memory to file    
 mem_dict = {}
+
+with open("saved_logs/random_GPT2_wt103/config_0/j2/model_config.yaml", "r") as f:
+    model_config = yaml.load(f, Loader=yaml.FullLoader)
 
 
 def parse_args():
@@ -80,6 +84,30 @@ def parse_args():
         type=int,
         help='number of sample to be evaluate the ranking consistency',
     )
+    parser.add_argument( "--exp_name", type=str, default=".", 
+                        help="path to the experiment",)
+    parser.add_argument('--model_type', default='hf_gpt2_flex', type=str,
+                     choices=['hf_gpt2', 'hf_gpt2_flex', 'hf_transfo_xl', 'mem_transformer'],
+                     help='Which model type to use')
+    parser.add_argument("--get_cost", action="store_true", help="compute cost for each method")
+    parser.add_argument("--seed", type=int, default=1111, help="Random seed")
+    parser.add_argument("--plot", action="store_true", help="plot the spearman corr and common ratio")
+    parser.add_argument("--method", type=str, default="snip", help="zero-cost method to use")
+    parser.add_argument("--cuda", action="store_true", help="use gpu for score calculation")
+
+    parser.add_argument("--batch_size", type=int, default=16, help="Global batch size")
+    parser.add_argument("--dataset", type=str, default="wt103", choices=["wt103", "lm1b"], help="Dataset name",)
+    parser.add_argument("--vocab", type=str, default="gpt2", choices=["gpt2"], help="Type of vocabulary")
+    parser.add_argument("--vocab_size", type=int, default=None, help="Size of vocabulary")
+    parser.add_argument("--dataload", type=str, default="random", help="random or grasp supported")
+    parser.add_argument("--dataload_info", type=int, default=1, 
+                        help="number of batches to use for random dataload or number of samples per class for grasp dataload",)
+    parser.add_argument("--start", type=int, default=5, help="start index")
+    parser.add_argument("--end", type=int, default=10, help="end index")
+    parser.add_argument("--write_freq", type=int, default=100, help="frequency of write to file")
+    
+    args = parser.parse_args()
+    args.device = torch.device("cuda" if args.cuda else "cpu")
 
     args = parser.parse_args()
     return args
@@ -363,34 +391,29 @@ def evolution_search(structure, inputs, iterations=1000, popu_size=50):
     return running_struct
 
 
-def generate_inputs():
-    # Target dataset is openwebtex
-    dataset = load_dataset('openwebtext')
-    tokenizer = ElectraTokenizerFast.from_pretrained(
-        'google/electra-small-discriminator'
-    )
-
-    def encode(examples):
-        return tokenizer(examples['text'], truncation=True, padding='max_length')
-
-    tokenized_dataset = dataset.map(encode, batched=True, num_proc=32)
-    tokenized_dataset.set_format(
-        type='torch', columns=['input_ids', 'token_type_ids', 'attention_mask']
-    )
-
-    # get sample tokenized batch from dataset
-    dataloader = torch.utils.data.DataLoader(dataset['train'], batch_size=128)
-    inputs = tokenizer(
-        next(iter(dataloader))['text'],
-        truncation=True,
-        padding='max_length',
-        return_tensors='pt',
-    )
-    return inputs
-
-
 if __name__ == '__main__':
-    inputs = generate_inputs()
+
+    # build inputs for gpt2 
+    args = parse_args()
+
+    if args.dataset == "wt103":
+        eval_batch_size = 16
+        eval_tgt_len = 192
+    elif args.dataset == "lm1b":
+        eval_batch_size = 16
+        eval_tgt_len = 32
+
+    data = './data/wikitext/wikitext-103'
+    cache_dir = './data/cachedir'
+    vocab = 'gpt2' if 'gpt' in args.model_type else 'word'
+    vocab_size = 50264 if 'gpt' in args.model_type else 267736
+    corpus = get_lm_corpus(data, cache_dir, args.dataset, vocab, vocab_size, refresh_cache=False)
+    train_itr = corpus.get_iterator("train", eval_batch_size, eval_tgt_len,
+                                    device=args.device, mem_len=0, ext_len=0)
+    if args.dataset != "lm1b":
+        train_iter = train_itr.get_fixlen_iter(start=0)
+    else:
+        train_iter = train_itr
 
     # preprocess search space structure
     if args.search_structure == 'linear':
@@ -404,7 +427,7 @@ if __name__ == '__main__':
             f'Not support {args.search_structure} structure.')
 
     logger.info('Begin Evolution Search...')
-    evolution_search(structure, inputs, args.iterations, args.popu_size)
+    evolution_search(structure, train_itr, args.iterations, args.popu_size)
 
     # save the memory to file
     if not os.path.exists(f'./output/memory'):
