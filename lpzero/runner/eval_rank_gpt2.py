@@ -299,7 +299,7 @@ def cost_fn(method, model, tr_iter, device):
         #     found_compute_cost += 1
         # assert found_compute_cost == n_relus, f'{found_compute_cost}, {n_relus}'
     elif method == 'lpzero':
-        cost = total_flops * 2 + model.compute
+        cost = total_flops * 2 
     else:
         raise NotImplementedError
 
