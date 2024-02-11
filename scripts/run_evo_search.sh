@@ -60,10 +60,14 @@
 # CUDA_VISIBLE_DEVICES=7 python lpzero/runner/evo_search.py \
 #     --log_path ./logs/evo_search_new_run10.log &
 
-NUM_SAMPLE=500
-CUDA_VISIBLE_DEVICES=7 python lpzero/runner/evo_search.py \
-    --log_path ./logs/evo_search_new_run10.log &
+# NUM_SAMPLE=500
+# CUDA_VISIBLE_DEVICES=7 python lpzero/runner/evo_search.py \
+#     --log_path ./logs/evo_search_new_run10.log &
 
-NUM_SAMPLE=500
-CUDA_VISIBLE_DEVICES=6 python lpzero/runner/evo_search.py \
-    --log_path ./logs/evo_search_new_run10.log &
+# NUM_SAMPLE=500
+# CUDA_VISIBLE_DEVICES=6 python lpzero/runner/evo_search.py \
+#     --log_path ./logs/evo_search_new_run10.log &
+
+NUM_SAMPLE=500 
+CUDA_VISIBLE_DEVICES=1 python lpzero/runner/evo_search_gpt2.py \
+    --log_path ./logs/evo_search_gpt2_test.log

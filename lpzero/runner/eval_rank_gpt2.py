@@ -360,8 +360,8 @@ if __name__ == "__main__":
 
     # "jacob_cov_relu"
     # "jacob_cov"
-    # methods = ["snip", "grad_norm", "fisher", "grasp", "synflow", "lpzero"]
-    methods = ["lpzero"]
+    methods = ["snip", "grad_norm", "fisher", "grasp", "synflow", "lpzero"]
+    # methods = ["lpzero"]
     for method in methods:
         print(f"------------ {method} ------------")
         if method == 'synflow':

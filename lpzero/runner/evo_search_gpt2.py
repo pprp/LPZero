@@ -16,7 +16,6 @@ import torch
 from datasets import load_dataset
 from loguru import logger
 from torch import Tensor
-from transformers import ElectraTokenizerFast
 
 from lpzero.model.flexibert.modeling_electra import (
     ElectraConfig,
@@ -124,8 +123,6 @@ def parse_args():
     
     args = parser.parse_args()
     args.device = torch.device("cuda" if args.cuda else "cpu")
-
-    args = parser.parse_args()
     return args
 
 
@@ -183,8 +180,6 @@ def get_scores(structure, tr_iter=None):
     for _f in set(files):
         if "model_config.yaml" in _f:
             idx =  re.search('(config_[0-9]+)', _f).span()[0]
-            job = _f[idx:]
-            config_name = job.split('/')[0] + '_' + job.split('/')[1]
             with open(_f, "r") as f:
                 model_config = yaml.full_load(f)
             
