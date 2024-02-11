@@ -1,4 +1,4 @@
-from lpzero.runner.evo_search import generate_inputs
+from lpzero.runner.evo_search_bert import generate_inputs
 from lpzero.utils.rank_consistency import spearman, kendalltau
 import pandas as pd
 from tqdm import tqdm

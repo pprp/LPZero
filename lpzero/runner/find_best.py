@@ -13,7 +13,7 @@ from lpzero.model.flexibert.modeling_electra import (
     ElectraLayer,
     ElectraModel,
 )
-from lpzero.runner.evo_search import all_same, generate_inputs, is_anomaly, parse_args
+from lpzero.runner.evo_search_bert import all_same, generate_inputs, is_anomaly, parse_args
 from lpzero.structures import GraphStructure, LinearStructure, TreeStructure
 from lpzero.utils.rank_consistency import spearman, kendalltau
 
