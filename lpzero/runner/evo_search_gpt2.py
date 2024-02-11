@@ -9,6 +9,8 @@ import math
 import random
 from typing import Union
 
+import re 
+import yaml
 import matplotlib.pyplot as plt
 import numpy as np
 import torch
@@ -19,11 +21,15 @@ from transformers import ElectraTokenizerFast
 
 from lpzero.model.flexibert.modeling_electra import (
     ElectraConfig,
-    ElectraLayer,
     ElectraModel,
-)
+) 
 from lpzero.structures import GraphStructure, LinearStructure, TreeStructure
 from lpzero.utils.rank_consistency import spearman
+import numpy as np
+from scipy.stats import spearmanr
+from lpzero.model.model_loader import load_model_from_config
+
+from lpzero.utils.rank_consistency import kendalltau
 
 configs = []
 with open('./data/BERT_benchmark.json', 'r') as f:
@@ -98,6 +104,100 @@ logger.add(
 
 def all_same(items):
     return all(x == items[0] for x in items)
+
+
+def get_scores(args, exp_name, tr_iter, method="lpzero", compute_cost=False, structure=None):
+    path_to_results = exp_name
+    
+    scores = {}
+    costs = {}
+    files = []
+    dirlist = [path_to_results]
+    while len(dirlist) > 0:
+        for (dirpath, dirnames, filenames) in os.walk(dirlist.pop()):
+            dirlist.extend([os.path.join(dirpath, d) for d in dirnames])
+            files.extend(map(lambda n: os.path.join(*n), zip([dirpath] * len(filenames), filenames),))
+
+    count = 1
+    yaml_file = os.path.join(path_to_results, f"{method}_scores_seed_{args.seed}.yaml")
+    cost_file = os.path.join(path_to_results, f"{method}_cost.yaml")
+    
+    gt_list = []
+    zc_list = []
+    
+    if not os.path.exists(yaml_file) or (compute_cost and not os.path.exists(cost_file)):
+        # almost 200 architectures 
+        for _f in set(files):
+            if "model_config.yaml" in _f:
+                idx =  re.search('(config_[0-9]+)', _f).span()[0]
+                job = _f[idx:]
+                config_name = job.split('/')[0] + '_' + job.split('/')[1]
+                with open(_f, "r") as f:
+                    model_config = yaml.full_load(f)
+                
+                model = load_model_from_config(args.model_type, model_config)
+                model.n_token = model_config["n_token"]
+                # measures = predictive.find_measures(
+                #     args,
+                #     model,
+                #     tr_iter,
+                #     (args.dataload, args.dataload_info, args.n_token),
+                #     args.device,
+                #     measure_names=[method],
+                # )
+                # scores[config_name] = measures[method]
+                # replace to structure 
+                zc = structure(inputs, model)
+                gt_list.append(model_config['valid_ppl'])
+                zc_list.append(zc)
+    
+    sp = spearman(gt_list, zc_list)
+    kd = kendalltau(gt_list, zc_list)
+    return sp, kd
+
+
+def get_metrics(topk, sorted_ground_truth, sorted_target, val_ppl_list_gt, val_ppl_list_target):
+    idx = int(topk / 100.0 * len(sorted_ground_truth))
+    sorted_ground_truth_binned = sorted_ground_truth[:idx].astype(np.int32)
+    sorted_target_binned = sorted_target[:idx].astype(np.int32)
+
+    correct = len(np.intersect1d(sorted_target_binned, sorted_ground_truth_binned))
+    total = len(sorted_target_binned)
+    common_ratio = correct * 1.0 / total
+    print("Correctly ranked top %d %% (%d) with %.2f accuracy" % (topk, total, correct * 1.0 / total))
+
+    topk_val_ppl_list_gt = [val_ppl_list_gt[i] for i in range(len(val_ppl_list_gt)) if i in sorted_ground_truth_binned]
+    topk_val_ppl_list_target = [val_ppl_list_target[i] for i in range(len(val_ppl_list_target)) if i in sorted_ground_truth_binned]
+    spr_rank, _ = spearmanr(topk_val_ppl_list_gt, topk_val_ppl_list_target)
+    print("Spearman Correlation on top %d %% (%d): %.3f" % (topk, len(topk_val_ppl_list_gt), spr_rank))
+    kendal_tau = kendalltau(topk_val_ppl_list_gt, topk_val_ppl_list_target)
+    print('Kendal tau on top %d %% (%d): %.3f'%(topk, len(topk_val_ppl_list_gt), kendal_tau))
+
+    return common_ratio, spr_rank, kendal_tau
+
+def get_statistics(method, results_gt, scores, topk_list):
+    # Simplified to focus on ranking correlation parts
+    common_configs = np.intersect1d(list(results_gt.keys()), list(scores[method].keys()))
+    print("analyzing {} architectures".format(len(common_configs)))
+
+    val_ppl_list_gt = [results_gt[k]["valid_ppl"] for k in common_configs]
+    sorted_ground_truth = np.argsort(val_ppl_list_gt)
+
+    target_scores = [-scores[method][k] for k in common_configs]
+    sorted_target = np.argsort(target_scores)
+
+    common_ratios = []
+    spr_ranks = []
+    kendall_ranks = []
+    for topk in topk_list:
+        common_ratio, spr_rank, kendall_rank = get_metrics(
+            topk, sorted_ground_truth, sorted_target, val_ppl_list_gt, target_scores
+        )
+        common_ratios.append(common_ratio)
+        spr_ranks.append(spr_rank)
+        kendall_ranks.append(kendall_rank)
+
+    return common_ratios, spr_ranks, kendall_ranks
 
 
 def fitness_spearman(structure, inputs, device=None, num_sample=50):
