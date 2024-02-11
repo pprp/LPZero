@@ -79,7 +79,6 @@ def get_layer_metric_array(net, metric, mode, include_embedding=False):
             metric_array.append(metric(layer))
         if isinstance(layer, nn.Embedding) and include_embedding:
             metric_array.append(metric(layer))
-
     return metric_array
 
 

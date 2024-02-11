@@ -19,6 +19,7 @@ import copy
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
+from torch import Tensor 
 
 from .p_utils import *
 from . import measures
@@ -126,11 +127,26 @@ def find_measures(
     # and loss function (loss_fn)
     # this function returns an array of zero-cost proxy metrics.
 
+    # def sum_arr(arr):
+    #     if isinstance(arr[0], (float, int)):
+    #         return sum(arr)
+        
+    #     _sum = 0.0
+    #     for i in range(len(arr)):
+    #         _sum += torch.sum(arr[i])
+    #     return _sum.item() 
+    
     def sum_arr(arr):
-        sum = 0.0
-        for i in range(len(arr)):
-            sum += torch.sum(arr[i])
-        return sum.item()
+        if not arr:
+            return 0
+
+        if isinstance(arr[0], (float, int)):
+            return sum(arr)
+        elif isinstance(arr[0], torch.Tensor):
+            return torch.sum(torch.stack(arr)).item()
+        else:
+            raise ValueError("Unsupported element type in the array")
+
 
     if measures_arr is None:
         measures_arr = find_measures_arrays(

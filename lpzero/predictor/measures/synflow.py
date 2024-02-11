@@ -272,7 +272,7 @@ def get_synflow_scores(args, exp_name):
                     model.forward = types.MethodType(forward_synflow_memformer, model)
                     model.crit.forward = types.MethodType(forward_crit, model.crit)
 
-                elif isinstance(net, HfGPT2Flex):
+                elif isinstance(model, HfGPT2Flex):
                     model.forward = types.MethodType(forward_synflow_gpt, model)
                     model.model.lm_head.forward = types.MethodType(forward_crit, model.model.lm_head)
 

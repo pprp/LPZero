@@ -42,7 +42,7 @@ def get_metrics(topk, sorted_ground_truth, sorted_target, val_ppl_list_gt, val_p
     kendal_tau = kendalltau(topk_val_ppl_list_gt, topk_val_ppl_list_target)
     print('Kendal tau on top %d %% (%d): %.3f'%(topk, len(topk_val_ppl_list_gt), kendal_tau))
 
-    return common_ratio, spr_rank
+    return common_ratio, spr_rank, kendal_tau
 
 
 def get_scores(args, exp_name, tr_iter, method="snip", compute_cost=False):
@@ -155,9 +155,10 @@ def get_statistics(method, results_gt, scores, nparams_dict, topk_list):
 
     common_ratios = []
     spr_ranks = []
+    kendall_ranks = []
     # extract common ratio and spearmanrank
     for topk in topk_list:
-        common_ratio, spr_rank = get_metrics(
+        common_ratio, spr_rank, kendall_rank = get_metrics(
             topk,
             sorted_ground_truth=sorted_ground_truth,
             sorted_target=sorted_target,
@@ -166,13 +167,15 @@ def get_statistics(method, results_gt, scores, nparams_dict, topk_list):
         )
         common_ratios.append(common_ratio)
         spr_ranks.append(spr_rank)
+        kendall_ranks.append(kendall_rank)
 
-    return common_ratios, spr_ranks, param_corr
+    return common_ratios, spr_ranks, param_corr, kendall_ranks
 
 
 def plot(args, methods):
     common_ratios = {}
     spr_ranks = {}
+    kendall_ranks = {}
     param_corrs = {}
 
     path_to_results = args.exp_name
@@ -209,13 +212,14 @@ def plot(args, methods):
         if m == "grasp":
             prev_scores = scores[m]
             scores[m] = {k: -s for k, s in prev_scores.items()}
-        common_ratio, spr_rank, param_corr = get_statistics(m, results_gt, scores, nparams_dict, topk_list)
-        print('avg FLOPs:', np.mean(list(costs[m].values())))
+        common_ratio, spr_rank, param_corr, kendall_rank = get_statistics(m, results_gt, scores, nparams_dict, topk_list)
+        print(f'[{m}] avg FLOPs: {np.mean(list(costs[m].values()))}')
         common_ratios[m] = common_ratio
         spr_ranks[m] = spr_rank
         param_corrs[m] = param_corr
+        kendall_ranks[m] = kendall_rank
 
-    markers = ["o", "^", "s", "P", "*", "X", "d", "v"]
+    markers = ["o", "^", "s", "P", "*", "X", "d", "v", "."]
     colors = plt.cm.Blues(np.linspace(0.5, 1, len(markers)))
     labels = {
         "grad_norm": "GradNorm",
@@ -226,6 +230,7 @@ def plot(args, methods):
         "jacob_cov_relu": "ReLU",
         "synflow": "Synflow",
         "nparams": "# Params",
+        "lpzero": "LPZero"
     }
     plt.figure(figsize=(6, 4))
     for i, m in enumerate(common_ratios.keys()):
@@ -233,22 +238,24 @@ def plot(args, methods):
         avg_cost = np.mean(list(costs[m].values()))
         plt.scatter(
             avg_cost,
-            spr_ranks[m][-1],
+            # spr_ranks[m][-1],
+            kendall_ranks[m][0],
             label=l,
             marker=markers[i],
             s=180,
             c=colors[i],
         )
-    plt.ylabel("Spearman's Correlation")
+    # plt.ylabel("Spearman's Correlation")
+    plt.ylabel("Kendall's Tau")
     plt.xlabel("FLOPs Cost")
-    plt.ylim((0.79, 1.0))
+    # plt.ylim((0.79, 1.0))
     # plt.xlim((-1e10, 2e11))
     plt.grid(axis="y")
     # plt.title('ranking based on zero-cost methods')
     plt.legend(loc="center left", bbox_to_anchor=(1, 0.5))
     path_to_plot = os.path.join(args.exp_name,'plots')
     os.makedirs(path_to_plot, exist_ok=True)
-    plt.savefig(os.path.join(path_to_plot, f"spearman_cost_zero-cost.png", bbox_inches="tight"))
+    plt.savefig(os.path.join(path_to_plot, f"kendalltau_cost_zero-cost.png"), bbox_inches="tight")
 
 
 def cost_fn(method, model, tr_iter, device):
@@ -291,6 +298,8 @@ def cost_fn(method, model, tr_iter, device):
         #     cost += layer.compute
         #     found_compute_cost += 1
         # assert found_compute_cost == n_relus, f'{found_compute_cost}, {n_relus}'
+    elif method == 'lpzero':
+        cost = total_flops * 2 + model.compute
     else:
         raise NotImplementedError
 
@@ -349,7 +358,10 @@ if __name__ == "__main__":
     train_itr = corpus.get_iterator("train", eval_batch_size, eval_tgt_len, device=args.device, mem_len=0, ext_len=0)
     args.n_token = len(corpus.vocab)
 
-    methods = ["snip", "grad_norm", "fisher", "jacob_cov", "grasp", "jacob_cov_relu", "synflow"]
+    # "jacob_cov_relu"
+    # "jacob_cov"
+    # methods = ["snip", "grad_norm", "fisher", "grasp", "synflow", "lpzero"]
+    methods = ["lpzero"]
     for method in methods:
         print(f"------------ {method} ------------")
         if method == 'synflow':
