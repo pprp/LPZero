@@ -20,6 +20,8 @@ import torch.nn.functional as F
 import types
 
 import transformers
+from lpzero.model.flexibert.modeling_electra import ElectraLayer, ElectraModel
+from lpzero.model.hf_gpt2.model_hf_gpt2 import HfGPT2, HfGPT2Flex
 
 from . import measure
 from ..p_utils import get_layer_metric_array
@@ -63,7 +65,7 @@ def snip_forward_conv1d(self, x):
 
 
 @measure("snip", bn=True, mode="param")
-def compute_snip_per_weight(net, inputs, targets, mode, loss_fn, split_data=1):
+def compute_snip_per_weight(net, inputs, targets=None, mode='param', loss_fn=None, split_data=1):
     for layer in net.modules():
         if isinstance(layer, nn.Conv2d) or isinstance(layer, transformers.Conv1D) or isinstance(layer, nn.Linear):
             layer.weight_mask = nn.Parameter(torch.ones_like(layer.weight))
@@ -90,9 +92,13 @@ def compute_snip_per_weight(net, inputs, targets, mode, loss_fn, split_data=1):
         st = sp * N // split_data
         en = (sp + 1) * N // split_data
 
-        loss, _, _, _ = net.forward(inputs[st:en, :], targets[st:en, :], mems=None)
-        loss = loss.float().mean().type_as(loss)
-        loss.backward()
+        if isinstance(net, (HfGPT2, HfGPT2Flex)):
+            loss, _, _, _ = net.forward(inputs[st:en, :], targets[st:en, :], mems=None)
+            loss = loss.float().mean().type_as(loss)
+            loss.backward()
+        elif isinstance(net, ElectraModel):
+            output = net(**inputs).last_hidden_state
+            output.backward(torch.ones_like(output))
 
     # select the gradients that we want to use for search/prune
     def snip(layer):
@@ -107,7 +113,7 @@ def compute_snip_per_weight(net, inputs, targets, mode, loss_fn, split_data=1):
 
 
 @measure("snip_wemb", bn=True, mode="param")
-def compute_snip_per_weight(net, inputs, targets, mode, loss_fn, split_data=1):
+def compute_snip_per_weight_2(net, inputs, targets, mode, loss_fn=None, split_data=1):
     for layer in net.modules():
         if (
             isinstance(layer, nn.Conv2d)
