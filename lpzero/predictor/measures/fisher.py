@@ -20,6 +20,8 @@ import torch.nn.functional as F
 import types
 
 import transformers
+from lpzero.model.flexibert.modeling_electra import ElectraLayer, ElectraModel
+from lpzero.model.hf_gpt2.model_hf_gpt2 import HfGPT2, HfGPT2Flex
 
 from . import measure
 from ..p_utils import get_layer_metric_array, reshape_elements
@@ -120,9 +122,13 @@ def compute_fisher_per_weight(net, inputs, targets, loss_fn, mode, split_data=1)
         en = (sp + 1) * N // split_data
 
         net.zero_grad()
-        loss, _, _, _ = net.forward(inputs[st:en, :], targets[st:en, :], mems=None)
-        loss = loss.float().mean().type_as(loss)
-        loss.backward()
+        if isinstance(net, (HfGPT2, HfGPT2Flex)):
+            loss, _, _, _ = net.forward(inputs[st:en, :], targets[st:en, :], mems=None)
+            loss = loss.float().mean().type_as(loss)
+            loss.backward()
+        elif isinstance(net, ElectraModel):
+            output = net(**inputs).last_hidden_state 
+            output.backward(torch.ones_like(output))
 
     # retrieve fisher info
     def fisher(layer):
