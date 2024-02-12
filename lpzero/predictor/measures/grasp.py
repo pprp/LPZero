@@ -18,13 +18,16 @@ import torch.nn as nn
 import torch.autograd as autograd
 import transformers
 
+from lpzero.model.flexibert.modeling_electra import ElectraLayer, ElectraModel
+from lpzero.model.hf_gpt2.model_hf_gpt2 import HfGPT2, HfGPT2Flex
+
 from . import measure
 from ..p_utils import get_layer_metric_array
 
 
 @measure("grasp", bn=True, mode="param", copy_net=False)
 def compute_grasp_per_weight(
-    net, inputs, targets, mode, loss_fn, T=1, num_iters=1, split_data=1
+    net, inputs, targets=None, mode='param', loss_fn=None, T=1, num_iters=1, split_data=1
 ):
 
     # get all applicable weights
@@ -45,9 +48,15 @@ def compute_grasp_per_weight(
 
         # forward/grad pass #1
         grad_w = None
-        loss, _, _, _ = net.forward(inputs[st:en, :], targets[st:en, :], mems=None)
-        loss = loss.float().mean().type_as(loss)
+        if isinstance(net, (HfGPT2, HfGPT2Flex)):
+            loss, _, _, _ = net.forward(inputs[st:en, :], targets[st:en, :], mems=None)
+            loss = loss.float().mean().type_as(loss)
+        elif isinstance(net, ElectraModel):
+            output = net(**inputs).last_hidde_state 
+            output.backward(torch.ones_like(output))
+        
         grad_w_p = autograd.grad(loss, weights, allow_unused=True)
+        
         if grad_w is None:
             grad_w = list(grad_w_p)
         else:
@@ -59,8 +68,13 @@ def compute_grasp_per_weight(
         en = (sp + 1) * N // split_data
 
         # forward/grad pass #2
-        loss, _, _, _ = net.forward(inputs[st:en, :], targets[st:en, :], mems=None)
-        loss = loss.float().mean().type_as(loss)
+        if isinstance(net, (HfGPT2, HfGPT2Flex)):
+            loss, _, _, _ = net.forward(inputs[st:en, :], targets[st:en, :], mems=None)
+            loss = loss.float().mean().type_as(loss)
+        elif isinstance(net, ElectraModel):
+            output = net(**inputs).last_hidde_state 
+            output.backward(torch.ones_like(output))
+        
         grad_f = autograd.grad(loss, weights, create_graph=True, allow_unused=True)
 
         # accumulate gradients computed in previous step and call backwards
