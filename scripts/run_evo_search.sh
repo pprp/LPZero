@@ -108,18 +108,18 @@
 
 ##### EVOLUTION SEARCH for BERT (ablation study)
 
-NUNARY=2
-CUDA_VISIBLE_DEVICES=0 python lpzero/runner/evo_search_bert.py --n_unary $NUNARY \
-    --log_path ./logs/evo_search_ablation_unary_number_NUNARY_${NUNARY}_run0.log 
+# NUNARY=2
+# CUDA_VISIBLE_DEVICES=0 python lpzero/runner/evo_search_bert.py --n_unary $NUNARY \
+#     --log_path ./logs/evo_search_ablation_unary_number_NUNARY_${NUNARY}_run0.log 
 
-# NUNARY=3
-# CUDA_VISIBLE_DEVICES=1 python lpzero/runner/evo_search.py --n_unary $NUNARY \
-#     --log_path ./logs/evo_search_ablation_unary_number_NUNARY_${NUNARY}_run1.log &
+NUNARY=3
+CUDA_VISIBLE_DEVICES=1 python lpzero/runner/evo_search_bert.py --n_unary $NUNARY \
+    --log_path ./logs/evo_search_ablation_unary_number_NUNARY_${NUNARY}_run1.log &
 
-# NUNARY=4
-# CUDA_VISIBLE_DEVICES=2 python lpzero/runner/evo_search.py --n_unary $NUNARY \
-#     --log_path ./logs/evo_search_ablation_unary_number_NUNARY_${NUNARY}_run2.log &
+NUNARY=4
+CUDA_VISIBLE_DEVICES=2 python lpzero/runner/evo_search_bert.py --n_unary $NUNARY \
+    --log_path ./logs/evo_search_ablation_unary_number_NUNARY_${NUNARY}_run2.log &
 
-# NUNARY=5
-# CUDA_VISIBLE_DEVICES=3 python lpzero/runner/evo_search.py --n_unary $NUNARY \
-#     --log_path ./logs/evo_search_ablation_unary_number_NUNARY_${NUNARY}_run3.log &
+NUNARY=5
+CUDA_VISIBLE_DEVICES=3 python lpzero/runner/evo_search_bert.py --n_unary $NUNARY \
+    --log_path ./logs/evo_search_ablation_unary_number_NUNARY_${NUNARY}_run3.log &
