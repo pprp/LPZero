@@ -9,15 +9,15 @@ from tqdm import tqdm
 from lpzero.predictor.measures.fisher import compute_fisher_per_weight
 from lpzero.predictor.measures.snip import compute_snip_per_weight 
 from lpzero.model.flexibert.modeling_electra import ElectraLayer, ElectraModel
-from lpzero.model.hf_gpt2.model_hf_gpt2 import HfGPT2, HfGPT2Flex
 
 from lpzero.model.flexibert.modeling_electra import (
     ElectraConfig,
     ElectraModel,
 )
-from lpzero.runner.evo_search_bert import all_same, generate_inputs, is_anomaly, parse_args
+from lpzero.runner.evo_search_bert import all_same, is_anomaly, parse_args
 from lpzero.structures import GraphStructure, LinearStructure, TreeStructure
 from lpzero.utils.rank_consistency import spearman, kendalltau
+from lpzero.utils.preprocess_openwebtext import generate_inputs
 
 configs = []
 with open('./data/BERT_benchmark.json', 'r') as f:
@@ -113,6 +113,15 @@ def fitness_spearman(inputs, structure, device=None, num_sample=500):
     plt.savefig(f'./output/{structure}_500.png')
     return sp, kd
 
+def sum_arr(arr):
+    if isinstance(arr[0], (float, int)):
+        return sum(arr)
+    
+    _sum = 0.0
+    for i in range(len(arr)):
+        _sum += torch.sum(arr[i])
+    return _sum.item() 
+    
 def fitness_proxy(inputs, proxy_type, device=None, num_samples=500):
     """fitness function for proxy."""
     device = device or torch.device(
@@ -132,7 +141,10 @@ def fitness_proxy(inputs, proxy_type, device=None, num_samples=500):
         )
         model = ElectraModel(config)
         model.to(device)
-        inputs.to(device)
+        if isinstance(inputs, torch.Tensor):
+            inputs.to(device)
+        elif isinstance(inputs, dict):
+            inputs = {k: v.to(device) for k, v in inputs.items()}
         # compute zc with the given structure
         if proxy_type == 'fisher':
             zc = compute_fisher_per_weight(model, inputs)
@@ -142,7 +154,12 @@ def fitness_proxy(inputs, proxy_type, device=None, num_samples=500):
             pass
         else: 
             raise NotImplementedError(f'Not support {proxy_type} proxy.')
-            
+                
+        if isinstance(zc, list):
+            zc = zc[0]
+        
+        zc = sum_arr(zc)        
+
         if is_anomaly(zc):
             return -1
 
@@ -179,11 +196,9 @@ def fitness_proxy(inputs, proxy_type, device=None, num_samples=500):
     sp = spearman(gt_score, zc_score)
     kd = kendalltau(gt_score, zc_score)
     
-    print(f'Spearman of {structure} is {sp}')
-    print(f'Kendalltau of {structure} is {kd}')
+    print(f'Spearman of {args.type} is {sp}')
+    print(f'Kendalltau of {args.type} is {kd}')
     
-    if structure.sp_score == -1:
-        structure.sp_score = sp
 
 def fitness_synflow(inputs, device=None, num_sample=500):
     """fitness function for synflow."""

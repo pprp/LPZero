@@ -66,9 +66,9 @@ def fisher_forward_conv1d(self, x):
 
 
 @measure("fisher", bn=True, mode="channel", copy_net=False)
-def compute_fisher_per_weight(net, inputs, targets, loss_fn, mode, split_data=1):
+def compute_fisher_per_weight(net, inputs, targets=None, loss_fn=None, mode="channel", split_data=1):
 
-    device = inputs.device
+    device = net.device
 
     if mode == "param":
         raise ValueError("Fisher pruning does not support parameter pruning.")
@@ -116,19 +116,20 @@ def compute_fisher_per_weight(net, inputs, targets, loss_fn, mode, split_data=1)
     for param in net.parameters():
         param.grad = None
 
-    N = inputs.shape[0]
-    for sp in range(split_data):
-        st = sp * N // split_data
-        en = (sp + 1) * N // split_data
+    if isinstance(net, (HfGPT2, HfGPT2Flex)):
+        N = inputs.shape[0]
+        for sp in range(split_data):
+            st = sp * N // split_data
+            en = (sp + 1) * N // split_data
 
-        net.zero_grad()
-        if isinstance(net, (HfGPT2, HfGPT2Flex)):
+            net.zero_grad()
             loss, _, _, _ = net.forward(inputs[st:en, :], targets[st:en, :], mems=None)
             loss = loss.float().mean().type_as(loss)
             loss.backward()
-        elif isinstance(net, ElectraModel):
-            output = net(**inputs).last_hidden_state 
-            output.backward(torch.ones_like(output))
+    
+    elif isinstance(net, ElectraModel):
+        output = net(**inputs).last_hidden_state 
+        output.backward(torch.ones_like(output))
 
     # retrieve fisher info
     def fisher(layer):
@@ -150,7 +151,7 @@ def compute_fisher_per_weight(net, inputs, targets, loss_fn, mode, split_data=1)
 
 
 @measure("fisher_wemb", bn=True, mode="channel", copy_net=False)
-def compute_fisher_per_weight(net, inputs, targets, loss_fn, mode, split_data=1):
+def compute_fisher_per_weight2(net, inputs, targets=None, loss_fn=None, mode="channel", split_data=1):
 
     device = inputs.device
 

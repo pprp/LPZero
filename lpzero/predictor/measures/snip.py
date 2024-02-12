@@ -87,18 +87,20 @@ def compute_snip_per_weight(net, inputs, targets=None, mode='param', loss_fn=Non
     for param in net.parameters():
         param.grad = None
 
-    N = inputs.shape[0]
-    for sp in range(split_data):
-        st = sp * N // split_data
-        en = (sp + 1) * N // split_data
+    if isinstance(net, (HfGPT2, HfGPT2Flex)):
+        N = inputs.shape[0]
+        for sp in range(split_data):
+            st = sp * N // split_data
+            en = (sp + 1) * N // split_data
 
-        if isinstance(net, (HfGPT2, HfGPT2Flex)):
+            net.zero_grad()
             loss, _, _, _ = net.forward(inputs[st:en, :], targets[st:en, :], mems=None)
             loss = loss.float().mean().type_as(loss)
             loss.backward()
-        elif isinstance(net, ElectraModel):
-            output = net(**inputs).last_hidden_state
-            output.backward(torch.ones_like(output))
+    
+    elif isinstance(net, ElectraModel):
+        output = net(**inputs).last_hidden_state 
+        output.backward(torch.ones_like(output))
 
     # select the gradients that we want to use for search/prune
     def snip(layer):
