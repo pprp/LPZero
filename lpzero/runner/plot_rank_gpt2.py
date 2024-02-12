@@ -54,8 +54,8 @@ def get_metrics(
         "Spearman Correlation on top %d %% (%d): %.3f"
         % (topk, len(topk_val_ppl_list_gt), spr_rank)
     )
-    # kendal_tau, _ = kendalltau(topk_val_ppl_list_gt, topk_val_ppl_list_target)
-    # print('Kendal tau on top %d %% (%d): %.3f'%(topk, len(topk_val_ppl_list_gt), kendal_tau))
+    kendal_tau, _ = kendalltau(topk_val_ppl_list_gt, topk_val_ppl_list_target)
+    print('Kendal tau on top %d %% (%d): %.3f'%(topk, len(topk_val_ppl_list_gt), kendal_tau))
 
     return common_ratio, spr_rank
 
