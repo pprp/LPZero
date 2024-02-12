@@ -92,9 +92,9 @@ class TreeStructure(BaseStructure):
         self._genotype['op_geno'] = geno
         self._repr_geno = repr_geno
 
-    def forward_tree(self, inputs, model, return_all=False):
-        try:
-            # if True:
+    def forward_tree(self, inputs, targets, model, return_all=False):
+        # try:
+        if True:
             A1, A2 = self._genotype['input_geno']
             A1 = get_zc_candidates(
                 self._genotype['input_geno'][0],
@@ -102,6 +102,7 @@ class TreeStructure(BaseStructure):
                 device=torch.device(
                     'cuda' if torch.cuda.is_available() else 'cpu'),
                 inputs=inputs,
+                targets=targets,
                 loss_fn=nn.CrossEntropyLoss(),
             )
             A2 = get_zc_candidates(
@@ -110,6 +111,7 @@ class TreeStructure(BaseStructure):
                 device=torch.device(
                     'cuda' if torch.cuda.is_available() else 'cpu'),
                 inputs=inputs,
+                targets=targets,
                 loss_fn=nn.CrossEntropyLoss(),
             )
 
@@ -133,17 +135,17 @@ class TreeStructure(BaseStructure):
                 A.append(binary_operation(
                     a1, a2, self._genotype['op_geno'][2]))
 
-        except Exception as e:
-            print('GOT ERROR in TREE STRUCTURE:', e)
-            return -1
+        # except Exception as e:
+        #     print('GOT ERROR in TREE STRUCTURE:', e)
+        #     return -1
 
         if return_all:
             return A, convert_to_float(A)
         else:
             return convert_to_float(A)
 
-    def __call__(self, inputs, model, return_all=False):
-        return self.forward_tree(inputs, model, return_all=return_all)
+    def __call__(self, model, inputs, targets=None, return_all=False):
+        return self.forward_tree(inputs=inputs, targets=targets, model=model, return_all=return_all)
 
     def cross_over_by_genotype(self, other):
         """Cross over two tree structure and return new one"""

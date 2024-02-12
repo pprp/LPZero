@@ -139,9 +139,14 @@ def compute_gradient(model, inputs, targets=None, **kwargs) -> List:
         output.backward(torch.ones_like(output))
         return grad_output
     elif isinstance(model, (HfGPT2, HfGPT2Flex)):
-        loss, _, _, _ = model.forward(inputs, targets, mems=None)
-        loss = loss.float().mean().type_as(loss)
-        loss.backward()
+        N = inputs.shape[0]
+        for sp in range(1):
+            st = sp * N // 1
+            en = (sp + 1) * N // 1
+
+            loss, _, _, _ = model.forward(inputs[st:en, :], targets[st:en, :], mems=None)
+            loss = loss.float().mean().type_as(loss)
+            loss.backward()
         
         grad_output = []
         for layer in model.modules():

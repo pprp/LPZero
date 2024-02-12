@@ -250,6 +250,7 @@ def get_batch_jacobian(net, x, target, device, split_data):
         x_emb = net.word_emb(x)
     if isinstance(net, HfGPT2Flex):    
         x_emb = net.model.transformer.wte(x)
+
     word_emb = x_emb.data
     word_emb.requires_grad_(True)
 

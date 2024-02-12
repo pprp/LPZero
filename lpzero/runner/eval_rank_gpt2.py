@@ -356,7 +356,8 @@ if __name__ == "__main__":
     vocab_size = 50264 if 'gpt' in args.model_type else 267736
     
     corpus = get_lm_corpus(data, cache_dir, args.dataset, vocab, vocab_size, refresh_cache=False)
-    train_itr = corpus.get_iterator("train", eval_batch_size, eval_tgt_len, device=args.device, mem_len=0, ext_len=0)
+    train_itr = corpus.get_iterator("train", eval_batch_size, eval_tgt_len, 
+                                    device=args.device, mem_len=0, ext_len=0)
     args.n_token = len(corpus.vocab)
 
     # "jacob_cov_relu"

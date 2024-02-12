@@ -124,7 +124,7 @@ def fitness_spearman(structure, inputs, device=None, num_sample=50):
         model = ElectraModel(config)
         model.to(device)
         inputs.to(device)
-        zc = structure(inputs, model)
+        zc = structure(model, inputs)
 
         if is_anomaly(zc):
             return -1

@@ -49,7 +49,7 @@ def find_best(inputs, structure, device=None, num_sample=500):
         model = ElectraModel(config)
         model.to(device)
         inputs.to(device)
-        zc = structure(inputs, model)
+        zc = structure(model, inputs)
         
         if best_zc < zc:
             best_zc = zc
@@ -84,7 +84,7 @@ def fitness_spearman(inputs, structure, device=None, num_sample=500):
         model = ElectraModel(config)
         model.to(device)
         inputs.to(device)
-        zc = structure(inputs, model)
+        zc = structure(model, inputs)
 
         if is_anomaly(zc):
             return -1

@@ -50,7 +50,7 @@ def fitness_spearman(inputs, structure, device=None, num_sample=500):
         model.to(device)
         inputs.to(device)
         # compute zc with the given structure
-        zc = structure(inputs, model)
+        zc = structure(model, inputs)
 
         if is_anomaly(zc):
             return -1

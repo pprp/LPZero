@@ -25,7 +25,7 @@ def get_some_data(args, train_dataloader, num_batches, device):
     else:
         train_iter = train_dataloader
 
-    for batch, (data, target, seq_len, _) in enumerate(train_iter, start=1):
+    for batch, (data, target, _, _) in enumerate(train_iter, start=1):
         if batch > num_batches:
             break
         traindata.append((data, target))

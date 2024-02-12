@@ -7,6 +7,9 @@ import math
 import random
 from typing import Union
 import collections
+import sys  
+import pdb
+import traceback 
 
 import re 
 import yaml
@@ -30,17 +33,20 @@ from lpzero.datasets.distributed_utils.data_utils import get_lm_corpus
 # save memory to file    
 mem_dict = {}
 
-def get_batch_data(train_iter, num_batches=5):
+def get_batch_data(train_iter, num_batches, device):
     traindata = []
-
+    # wkitext103
+    train_iter = train_iter.get_fixlen_iter(start=0)
+        
     for batch, (data, target, _, _) in enumerate(train_iter, start=1):
         if batch > num_batches:
             break
-
         traindata.append((data, target))
 
     inputs = torch.cat([a for a, _ in traindata], dim=-1)
     targets = torch.cat([b for _, b in traindata], dim=-1)
+    inputs = inputs.to(device)
+    targets = targets.to(device)
     return inputs, targets 
 
 
@@ -145,8 +151,8 @@ def convert_path_to_config_format(path: str) -> str:
 def get_scores(structure, tr_iter=None):
     assert structure is not None, "structure is not defined"
     path_to_results = './saved_logs/random_GPT2_wt103'
-    
-    inputs, targets = get_batch_data(tr_iter, num_batches=5)
+    device = torch.device("cuda" if args.cuda else "cpu")
+    inputs, targets = get_batch_data(tr_iter, 1, device)
     
     files = []
     dirlist = [path_to_results]
@@ -154,7 +160,7 @@ def get_scores(structure, tr_iter=None):
         for (dirpath, dirnames, filenames) in os.walk(dirlist.pop()):
             dirlist.extend([os.path.join(dirpath, d) for d in dirnames])
             files.extend(map(lambda n: os.path.join(*n), zip([dirpath] * len(filenames), filenames),))
-
+    
     # load the ground-truth rankings
     yaml_file = os.path.join(path_to_results, "ppl_summary.yaml")
     with open(yaml_file, "r") as f:
@@ -163,7 +169,10 @@ def get_scores(structure, tr_iter=None):
     gt_list = []
     zc_list = []
         
-    # almost 200 architectures 
+    # almost 200 architectures
+    # random sample 50 architectures to evaluate the ranking consistency
+    files = random.sample(files, args.num_sample)
+    
     for _f in set(files):
         if "model_config.yaml" in _f:
             idx =  re.search('(config_[0-9]+)', _f).span()[0]
@@ -172,59 +181,21 @@ def get_scores(structure, tr_iter=None):
             
             model = load_model_from_config(args.model_type, model_config)
             model.n_token = model_config["n_token"]
+            model.to(device)
                         
             # replace to structure 
-            zc = structure(inputs, model)
+            zc = structure(model, inputs, targets)
             gt_list.append(results_gt[convert_path_to_config_format(_f)]["valid_ppl"])
             zc_list.append(zc)
+            
+            del model 
+            import gc 
+            gc.collect()
+            torch.cuda.empty_cache()
     
     sp = spearman(gt_list, zc_list)
     kd = kendalltau(gt_list, zc_list)
     return sp
-
-
-def get_metrics(topk, sorted_ground_truth, sorted_target, val_ppl_list_gt, val_ppl_list_target):
-    idx = int(topk / 100.0 * len(sorted_ground_truth))
-    sorted_ground_truth_binned = sorted_ground_truth[:idx].astype(np.int32)
-    sorted_target_binned = sorted_target[:idx].astype(np.int32)
-
-    correct = len(np.intersect1d(sorted_target_binned, sorted_ground_truth_binned))
-    total = len(sorted_target_binned)
-    common_ratio = correct * 1.0 / total
-    print("Correctly ranked top %d %% (%d) with %.2f accuracy" % (topk, total, correct * 1.0 / total))
-
-    topk_val_ppl_list_gt = [val_ppl_list_gt[i] for i in range(len(val_ppl_list_gt)) if i in sorted_ground_truth_binned]
-    topk_val_ppl_list_target = [val_ppl_list_target[i] for i in range(len(val_ppl_list_target)) if i in sorted_ground_truth_binned]
-    spr_rank, _ = spearmanr(topk_val_ppl_list_gt, topk_val_ppl_list_target)
-    print("Spearman Correlation on top %d %% (%d): %.3f" % (topk, len(topk_val_ppl_list_gt), spr_rank))
-    kendal_tau = kendalltau(topk_val_ppl_list_gt, topk_val_ppl_list_target)
-    print('Kendal tau on top %d %% (%d): %.3f'%(topk, len(topk_val_ppl_list_gt), kendal_tau))
-
-    return common_ratio, spr_rank, kendal_tau
-
-def get_statistics(method, results_gt, scores, topk_list):
-    # Simplified to focus on ranking correlation parts
-    common_configs = np.intersect1d(list(results_gt.keys()), list(scores[method].keys()))
-    print("analyzing {} architectures".format(len(common_configs)))
-
-    val_ppl_list_gt = [results_gt[k]["valid_ppl"] for k in common_configs]
-    sorted_ground_truth = np.argsort(val_ppl_list_gt)
-
-    target_scores = [-scores[method][k] for k in common_configs]
-    sorted_target = np.argsort(target_scores)
-
-    common_ratios = []
-    spr_ranks = []
-    kendall_ranks = []
-    for topk in topk_list:
-        common_ratio, spr_rank, kendall_rank = get_metrics(
-            topk, sorted_ground_truth, sorted_target, val_ppl_list_gt, target_scores
-        )
-        common_ratios.append(common_ratio)
-        spr_ranks.append(spr_rank)
-        kendall_ranks.append(kendall_rank)
-
-    return common_ratios, spr_ranks, kendall_ranks
 
 
 def is_anomaly(zc_score: Union[torch.Tensor, float, int] = None) -> bool:
@@ -332,7 +303,7 @@ def evolution_search(structure, train_itr, iterations=1000, popu_size=50):
     return running_struct
 
 
-if __name__ == '__main__':
+def main():
     if args.dataset == "wt103":
         eval_batch_size = 16
         eval_tgt_len = 192
@@ -350,11 +321,6 @@ if __name__ == '__main__':
     train_itr = corpus.get_iterator("train", eval_batch_size, eval_tgt_len,
                                     device=device, mem_len=0, ext_len=0)
     args.n_token = len(corpus.vocab)
-    
-    if args.dataset != "lm1b":
-        train_iter = train_itr.get_fixlen_iter(start=0)
-    else:
-        train_iter = train_itr
 
     # preprocess search space structure
     if args.search_structure == 'linear':
@@ -377,3 +343,11 @@ if __name__ == '__main__':
     exp_name = os.path.basename(args.log_path).split('.')[0]
     with open(f'./output/memory/mem_dict_{exp_name}.json', 'w') as f:
         json.dump(mem_dict, f)
+    
+if __name__ == "__main__":
+    try: 
+        main()
+    except: 
+        extype, value, tb = sys.exc_info()
+        traceback.print_exc()
+        pdb.post_mortem(tb)
