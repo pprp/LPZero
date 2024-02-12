@@ -87,6 +87,14 @@ def parse_args():
         type=int,
         help='number of unary operations',
     )
+    
+    # type 
+    parser.add_argument(
+        '--type',
+        default='lpzero',
+        type=str,
+        help='type of proxy',
+    )
 
     args = parser.parse_args()
     return args
@@ -299,6 +307,7 @@ def generate_inputs():
         padding='max_length',
         return_tensors='pt',
     )
+    
     return inputs
 
 
