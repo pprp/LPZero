@@ -294,7 +294,7 @@ def generate_inputs():
     def encode(examples):
         return tokenizer(examples['text'], truncation=True, padding='max_length')
 
-    tokenized_dataset = dataset.map(encode, batched=True, num_proc=32)
+    tokenized_dataset = dataset.map(encode, batched=True, num_proc=128)
     tokenized_dataset.set_format(
         type='torch', columns=['input_ids', 'token_type_ids', 'attention_mask']
     )

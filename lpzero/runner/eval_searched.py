@@ -6,11 +6,13 @@ import pandas as pd
 import torch
 from datasets import load_dataset
 from tqdm import tqdm
-from transformers import ElectraTokenizerFast
+from lpzero.predictor.measures.fisher import compute_fisher_per_weight
+from lpzero.predictor.measures.snip import compute_snip_per_weight 
+from lpzero.model.flexibert.modeling_electra import ElectraLayer, ElectraModel
+from lpzero.model.hf_gpt2.model_hf_gpt2 import HfGPT2, HfGPT2Flex
 
 from lpzero.model.flexibert.modeling_electra import (
     ElectraConfig,
-    ElectraLayer,
     ElectraModel,
 )
 from lpzero.runner.evo_search_bert import all_same, generate_inputs, is_anomaly, parse_args
@@ -111,7 +113,7 @@ def fitness_spearman(inputs, structure, device=None, num_sample=500):
     plt.savefig(f'./output/{structure}_500.png')
     return sp, kd
 
-def fitness_proxy(inputs, device=None, num_samples=500):
+def fitness_proxy(inputs, proxy_type, device=None, num_samples=500):
     """fitness function for proxy."""
     device = device or torch.device(
         'cuda' if torch.cuda.is_available() else 'cpu')
@@ -120,6 +122,78 @@ def fitness_proxy(inputs, device=None, num_samples=500):
     zc_score = []
 
     for i in tqdm(range(num_samples)):
+        nas_config = configs[i]['hparams']['model_hparam_overrides']['nas_config']
+        gt = configs[i]['scores']['glue']
+        # build a new model
+        config = ElectraConfig(
+            nas_config=nas_config,
+            num_hidden_layers=len(nas_config['encoder_layers']),
+            output_hidden_states=True,
+        )
+        model = ElectraModel(config)
+        model.to(device)
+        inputs.to(device)
+        # compute zc with the given structure
+        if proxy_type == 'fisher':
+            zc = compute_fisher_per_weight(model, inputs)
+        elif proxy_type == 'snip':
+            zc = compute_snip_per_weight(model, inputs)
+        elif proxy_type == 'grasp':
+            pass
+        else: 
+            raise NotImplementedError(f'Not support {proxy_type} proxy.')
+            
+        if is_anomaly(zc):
+            return -1
+
+        # early exit
+        if len(zc_score) > 3 and all_same(zc_score):
+            return -1
+
+        zc_score.append(zc)
+        gt_score.append(gt)
+
+        del model
+        if torch.cuda.is_available():
+            torch.cuda.empty_cache()
+
+        # gc.collect()
+
+    # TODO add inf check
+    try:
+        if len(zc_score) <= 1 or np.isnan(spearman(gt_score, zc_score)):
+            return -1
+    except TypeError as e:
+        import pdb
+
+        pdb.set_trace()
+
+    df['lpzero'] = zc_score
+    df.to_csv('./BERT_results_activation_3.csv', index=False)
+
+    # release memory
+    del inputs
+    torch.cuda.empty_cache()
+    # gc.collect()
+
+    sp = spearman(gt_score, zc_score)
+    kd = kendalltau(gt_score, zc_score)
+    
+    print(f'Spearman of {structure} is {sp}')
+    print(f'Kendalltau of {structure} is {kd}')
+    
+    if structure.sp_score == -1:
+        structure.sp_score = sp
+
+def fitness_synflow(inputs, device=None, num_sample=500):
+    """fitness function for synflow."""
+    device = device or torch.device(
+        'cuda' if torch.cuda.is_available() else 'cpu')
+    df = pd.read_csv('./BERT_results_activation.csv')
+    gt_score = []
+    zc_score = []
+
+    for i in tqdm(range(num_sample)):
         nas_config = configs[i]['hparams']['model_hparam_overrides']['nas_config']
         gt = configs[i]['scores']['glue']
         # build a new model
@@ -175,8 +249,6 @@ def fitness_proxy(inputs, device=None, num_samples=500):
     
     if structure.sp_score == -1:
         structure.sp_score = sp
-
-
 
 if __name__ == '__main__':
     inputs = generate_inputs()
@@ -235,6 +307,6 @@ if __name__ == '__main__':
         print(f'Spearman of {struct} is {sp}')
         print(f'Kendalltau of {struct} is {kd}')
 
-    elif args.type == 'proxy':
+    else:
         # other proxies to be tested 
-        fitness_proxy(inputs)
+        fitness_proxy(inputs, proxy_type=args.type)
