@@ -47,9 +47,15 @@ class TreeStructure(BaseStructure):
         _repr_geno = ''
         _repr_geno += f'INPUT:({self._genotype["input_geno"][0]}, {self._genotype["input_geno"][1]})'
         # for input1
-        _repr_geno += f'TREE:({UNARY_KEYS[self._genotype["op_geno"][0][0]]}|{UNARY_KEYS[self._genotype["op_geno"][0][1]]}|'
+        _repr_geno += "TREE:("
+        for i in range(self.n_unary):
+            _repr_geno += f'{UNARY_KEYS[self._genotype["op_geno"][0][i]]}|'
         # for input2
-        _repr_geno += f'{UNARY_KEYS[self._genotype["op_geno"][1][0]]}|{UNARY_KEYS[self._genotype["op_geno"][1][1]]})'
+        for i in range(self.n_unary):
+            if i < self.n_unary - 1:
+                _repr_geno += f'{UNARY_KEYS[self._genotype["op_geno"][1][i]]}|'
+            else:
+                _repr_geno += f'{UNARY_KEYS[self._genotype["op_geno"][1][i]]})'
         # for binary operation
         _repr_geno += f'BINARY:({BINARY_KEYS[self._genotype["op_geno"][2]]})'
         return _repr_geno
@@ -171,7 +177,7 @@ class TreeStructure(BaseStructure):
         op_geno = []
         for idx in range(2):
             op_geno.append([])
-            for op_idx in range(2):
+            for op_idx in range(self.n_unary):
                 if random.random() < 0.5:
                     op_geno[idx].append(self._genotype['op_geno'][idx][op_idx])
                 else:
@@ -180,7 +186,7 @@ class TreeStructure(BaseStructure):
         tree._genotype['op_geno'] = op_geno
 
         # cross over binary operation
-        if random.random() < 0.5:
+        if random.random() < 0.2:
             tree._genotype['op_geno'].append(self._genotype['op_geno'][2])
         else:
             tree._genotype['op_geno'].append(other._genotype['op_geno'][2])
@@ -189,9 +195,16 @@ class TreeStructure(BaseStructure):
         repr_geno = ''
         repr_geno += f'INPUT:({tree._genotype["input_geno"][0]}, {tree._genotype["input_geno"][1]})'
         # for input1
-        repr_geno += f'TREE:({UNARY_KEYS[tree._genotype["op_geno"][0][0]]}-{UNARY_KEYS[tree._genotype["op_geno"][0][1]]}|'
+        repr_geno += 'TREE:('
+        for i in range(self.n_unary):
+            repr_geno += f'{UNARY_KEYS[tree._genotype["op_geno"][0][i]]}|'
         # for input2
-        repr_geno += f'{UNARY_KEYS[tree._genotype["op_geno"][1][0]]}-{UNARY_KEYS[tree._genotype["op_geno"][1][1]]})'
+        for i in range(self.n_unary):
+            if i < self.n_unary - 1:
+                repr_geno += f'{UNARY_KEYS[tree._genotype["op_geno"][1][i]]}|'
+            else:
+                repr_geno += f'{UNARY_KEYS[tree._genotype["op_geno"][1][i]]})'
+                
         # for binary operation
         repr_geno += f'BINARY:({BINARY_KEYS[tree._genotype["op_geno"][2]]})'
         tree._repr_geno = repr_geno
@@ -213,7 +226,7 @@ class TreeStructure(BaseStructure):
         op_geno = []
         for idx in range(2):
             op_geno.append([])
-            for op_idx in range(2):
+            for op_idx in range(self.n_unary):
                 if random.random() < 0.5:
                     op_geno[idx].append(self._genotype['op_geno'][idx][op_idx])
                 else:
@@ -229,10 +242,17 @@ class TreeStructure(BaseStructure):
         # update repr_geno
         repr_geno = ''
         repr_geno += f'INPUT:({tree._genotype["input_geno"][0]}, {tree._genotype["input_geno"][1]})'
+        repr_geno += 'TREE:('
         # for input1
-        repr_geno += f'TREE:({UNARY_KEYS[tree._genotype["op_geno"][0][0]]}-{UNARY_KEYS[tree._genotype["op_geno"][0][1]]}|'
+        for i in range(self.n_unary):
+            repr_geno += f'{UNARY_KEYS[tree._genotype["op_geno"][0][i]]}|'
         # for input2
-        repr_geno += f'{UNARY_KEYS[tree._genotype["op_geno"][1][0]]}-{UNARY_KEYS[tree._genotype["op_geno"][1][1]]})'
+        for i in range(self.n_unary):
+            if i < self.n_unary - 1:
+                repr_geno += f'{UNARY_KEYS[tree._genotype["op_geno"][1][i]]}|'
+            else:
+                repr_geno += f'{UNARY_KEYS[tree._genotype["op_geno"][1][i]]})'
+        
         # for binary operation
         repr_geno += f'BINARY:({BINARY_KEYS[tree._genotype["op_geno"][2]]})'
         tree._repr_geno = repr_geno

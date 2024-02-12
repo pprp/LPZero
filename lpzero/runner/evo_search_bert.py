@@ -80,6 +80,13 @@ def parse_args():
         type=int,
         help='number of sample to be evaluate the ranking consistency',
     )
+    # n_unary 
+    parser.add_argument(
+        '--n_unary',
+        default=2,
+        type=int,
+        help='number of unary operations',
+    )
 
     args = parser.parse_args()
     return args
@@ -186,7 +193,7 @@ def evolution_search(structure, inputs, iterations=1000, popu_size=50):
     logger.info('Initialize population')
 
     while len(population) < popu_size:
-        struct = structure()
+        struct = structure(n_unary=args.n_unary)
         score = fitness_spearman(struct, inputs)
         if is_anomaly(score):
             continue
