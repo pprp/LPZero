@@ -10,25 +10,25 @@ from . import zc_candidates
 from lpzero.predictor.measures.jacob_cov import modify_net, get_batch_jacobian
 import transformers 
 
-@zc_candidates('jacobs')
-def compute_jacobs(model, inputs, targets=None, **kwargs) -> List:
-    if isinstance(model, ElectraModel):
-        output = model(**inputs).last_hidden_state
-        output.backward(torch.ones_like(output))
-        jacobs = model.embeddings.position_embeddings.weight.grad.detach()
-        return jacobs
-    elif isinstance(model, (HfGPT2, HfGPT2Flex)):
-        # TODO TO be tested. 
-        device = inputs.device
-        model = modify_net(model).to(device)
-        model.zero_grad()
-        jacobs, labels = get_batch_jacobian(
-            model, inputs, targets, device, split_data=1
-        )
-        jacobs = jacobs.reshape(jacobs.size(0), -1).cpu().numpy() 
-        return jacobs 
-    else:
-        raise NotImplementedError(f"model type {type(model)} is not supported for jacobians")
+# @zc_candidates('jacobs')
+# def compute_jacobs(model, inputs, targets=None, **kwargs) -> List:
+#     if isinstance(model, ElectraModel):
+#         output = model(**inputs).last_hidden_state
+#         output.backward(torch.ones_like(output))
+#         jacobs = model.embeddings.position_embeddings.weight.grad.detach()
+#         return jacobs
+#     elif isinstance(model, (HfGPT2, HfGPT2Flex)):
+#         # TODO TO be tested. 
+#         device = inputs.device
+#         model = modify_net(model).to(device)
+#         model.zero_grad()
+#         jacobs, labels = get_batch_jacobian(
+#             model, inputs, targets, device, split_data=1
+#         )
+#         jacobs = jacobs.reshape(jacobs.size(0), -1).cpu().numpy() 
+#         return jacobs 
+#     else:
+#         raise NotImplementedError(f"model type {type(model)} is not supported for jacobians")
         
 
 
@@ -139,14 +139,12 @@ def compute_gradient(model, inputs, targets=None, **kwargs) -> List:
         output.backward(torch.ones_like(output))
         return grad_output
     elif isinstance(model, (HfGPT2, HfGPT2Flex)):
-        N = inputs.shape[0]
-        for sp in range(1):
-            st = sp * N // 1
-            en = (sp + 1) * N // 1
-
-            loss, _, _, _ = model.forward(inputs[st:en, :], targets[st:en, :], mems=None)
-            loss = loss.float().mean().type_as(loss)
-            loss.backward()
+        assert inputs is not None, "inputs must be provided for computing gradients"
+        if targets is None:
+            print("current targets is None, maybe invalid for computing gradients")
+        loss, _, _, _ = model.forward(inputs, targets, mems=None)
+        loss = loss.float().mean().type_as(loss)
+        loss.backward()
         
         grad_output = []
         for layer in model.modules():

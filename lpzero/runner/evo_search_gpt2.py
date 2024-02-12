@@ -221,10 +221,10 @@ def evolution_search(structure, train_itr, iterations=1000, popu_size=50):
 
     while len(population) < popu_size:
         struct = structure()
+        logger.info(f'Current population size: {len(population)} with {struct}')
         score = get_scores(struct, train_itr)
         if is_anomaly(score):
             continue
-        logger.info(f'Current population size: {len(population)}')
         logger.info(f'Current structure: {struct} with score: {score}')
         population.append(struct)
 

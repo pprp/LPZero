@@ -1,5 +1,7 @@
 #!/bin/bash
 
+#### EVOLUTION SEARCH for BERT 
+
 # NUM_SAMPLE=50
 # CUDA_VISIBLE_DEVICES=5 python lpzero/runner/evo_search.py \
 #     --log_path ./logs/evo_search_run6.log
@@ -68,9 +70,12 @@
 # CUDA_VISIBLE_DEVICES=6 python lpzero/runner/evo_search.py \
 #     --log_path ./logs/evo_search_new_run10.log &
 
-NUM_SAMPLE=500 
-CUDA_VISIBLE_DEVICES=0 python lpzero/runner/evo_search_gpt2.py \
-    --log_path ./logs/evo_search_gpt2_run0.log 
+#### EVOLUTION SEARCH for GPT2
+
+
+# NUM_SAMPLE=500 
+# CUDA_VISIBLE_DEVICES=0 python lpzero/runner/evo_search_gpt2.py \
+#     --log_path ./logs/evo_search_gpt2_run0.log 
 
 # NUM_SAMPLE=500
 # CUDA_VISIBLE_DEVICES=1 python lpzero/runner/evo_search_gpt2.py \
@@ -99,3 +104,10 @@ CUDA_VISIBLE_DEVICES=0 python lpzero/runner/evo_search_gpt2.py \
 # NUM_SAMPLE=500
 # CUDA_VISIBLE_DEVICES=7 python lpzero/runner/evo_search_gpt2.py \
 #     --log_path ./logs/evo_search_gpt2_run7.log &
+
+
+##### EVOLUTION SEARCH for BERT (ablation study)
+
+NUM_SAMPLE=500
+CUDA_VISIBLE_DEVICES=0 python lpzero/runner/evo_search.py \
+    --log_path ./logs/evo_search_ablation_unary_number_run0.log \

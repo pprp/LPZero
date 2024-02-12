@@ -6,11 +6,9 @@ import pandas as pd
 import torch
 from datasets import load_dataset
 from tqdm import tqdm
-from transformers import ElectraTokenizerFast
 
 from lpzero.model.flexibert.modeling_electra import (
     ElectraConfig,
-    ElectraLayer,
     ElectraModel,
 )
 from lpzero.runner.evo_search_bert import all_same, generate_inputs, is_anomaly, parse_args
