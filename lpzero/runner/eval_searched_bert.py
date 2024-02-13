@@ -20,6 +20,7 @@ from lpzero.runner.evo_search_bert import all_same, is_anomaly, parse_args
 from lpzero.structures import GraphStructure, LinearStructure, TreeStructure
 from lpzero.utils.rank_consistency import spearman, kendalltau
 from lpzero.utils.preprocess_openwebtext import generate_inputs
+from lpzero.predictor.measures.activation_distance import compute_act_dist
 
 configs = []
 with open('./data/BERT_benchmark.json', 'r') as f:
@@ -162,6 +163,8 @@ def fitness_proxy(inputs, proxy_type, device=None, num_samples=500):
             zc = compute_logsynflow_per_weight(model, inputs)
         elif proxy_type == 'gradnorm':
             zc = get_grad_norm_arr(model, inputs)
+        elif proxy_type == 'act_dist':
+            zc = compute_act_dist(model, inputs)
         else: 
             raise NotImplementedError(f'Not support {proxy_type} proxy.')
                 

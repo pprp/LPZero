@@ -25,6 +25,11 @@ def synaptic_saliency(model):
 
     return summed.detach().item()
 
+def compute_synaptic_saliency(model, inputs):
+    outputs = model(**inputs).last_hidden_state
+    outputs.backward(torch.ones_like(outputs))
+    return synaptic_saliency(model)
+
 
 def synaptic_saliency_normalized(model):
     metric_array = []

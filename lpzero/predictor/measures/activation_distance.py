@@ -37,8 +37,9 @@ def activation_distance_normalized(outputs):
 
 
 @measure("activation_distance")
-def compute_act_dist(net, inputs, targets, loss_fn, mode, split_data=1):
-    device = inputs.device
+def compute_act_dist(net, inputs, targets=None, loss_fn=None, mode=None,
+                     split_data=1):
+    device = net.device
 
     net.train()
     all_hooks = []
@@ -65,7 +66,7 @@ def compute_act_dist(net, inputs, targets, loss_fn, mode, split_data=1):
             all_hooks.append(hook)
 
     with torch.no_grad():
-        outputs = net(inputs)
+        outputs = net(**inputs).last_hidden_state
 
     for hook in all_hooks:
         hook.remove()

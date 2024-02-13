@@ -1,5 +1,9 @@
 import torch
-
+from lpzero.model.flexibert.modeling_electra import (
+    ElectraConfig,
+    ElectraLayer,
+    ElectraModel,
+)
 
 # Attention Confidence metric (for both head and softmax)
 def attention_confidence(outputs):
@@ -25,3 +29,31 @@ def attention_confidence_normalized(outputs):
     summed /= len(metric_array)
 
     return summed.detach().item()
+
+def compute_attention_confidence(model, inputs):
+    head_outputs = []
+
+    def head_hook(module, input, output):
+        head_outputs.append(output)
+
+    # Initialize hooks
+    for layer in model.modules():
+        if isinstance(layer, ElectraLayer):
+            sublayer = layer.operation.operation
+            if hasattr(sublayer, 'query'):
+                sublayer.query.register_forward_hook(head_hook)
+            if hasattr(sublayer, 'key'):
+                sublayer.key.register_forward_hook(head_hook)
+            if hasattr(sublayer, 'value'):
+                sublayer.value.register_forward_hook(head_hook)
+            if hasattr(sublayer, 'input'):
+                sublayer.input.register_forward_hook(head_hook)
+            if hasattr(sublayer, 'weight'):
+                sublayer.weight.register_forward_hook(head_hook)
+
+    # Run gradient with respect to ones
+    model.zero_grad()
+    output = model(**inputs).last_hidden_state
+    output.backward(torch.ones_like(output))
+    
+    return attention_confidence(head_outputs)
