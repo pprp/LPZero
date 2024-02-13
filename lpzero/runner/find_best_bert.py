@@ -57,6 +57,8 @@ def find_best(inputs, structure, device=None, num_sample=500):
     
     return best_gt, best_nas_config, best_scores
 
+
+
 if __name__ == '__main__':
     inputs = generate_inputs()
 
