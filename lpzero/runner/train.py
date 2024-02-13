@@ -64,7 +64,7 @@ def parse_args():
     config_args, _ = cfg_parser.parse_known_args()
 
     if config_args.config is not None and config_args.config_file is not None:
-        config_file_path = utils.full_path(os.path.join('.', 'nlp_logs', config_args.config_file))
+        config_file_path = utils.full_path(os.path.join('.', config_args.config_file))
         with open(config_file_path) as f:
             config = yaml.load(f, Loader=yaml.FullLoader)[config_args.config]['train']
     else:
@@ -749,10 +749,6 @@ def init(disable_multiple_dlogger=False):
     log_file = os.path.join(args.work_dir, log_file)
     dllog_file = os.path.join(args.work_dir, dllog_file)
 
-    # if args.debug:
-    #     log_file = os.devnull
-    #     dllog_file = os.devnull
-
     exp_utils.setup_logging(log_all_ranks=args.log_all_ranks, filename=log_file)
     exp_utils.setup_dllogger(enabled=True, filename=dllog_file, disable_multiple=disable_multiple_dlogger)
 
@@ -1270,7 +1266,7 @@ def main():
         model, model_config, _ = load_model_from_checkpoint(args.model_type, checkpoint_path, replace_model_config=replace_model_config, on_cpu=False)
 
         # Prepares the model with QAT (also allows for distributed training)
-        model = prepare_with_qat(model, onnx_compatible=True)
+        # model = prepare_with_qat(model, onnx_compatible=True)
         model = model.to(device)
         para_model, model = distributed_model(args, model, device)
 

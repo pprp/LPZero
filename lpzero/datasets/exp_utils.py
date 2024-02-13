@@ -263,7 +263,7 @@ def get_create_dirs(dataroot:Optional[str], dataset_name:str,
     dataroot = dataroot or pt_data_dir or common.default_dataroot()
     dataroot = utils.full_path(dataroot)
 
-    dataset_dir = utils.full_path(os.path.join(dataroot,'textpred', dataset_dir_name(dataset_name)))
+    dataset_dir = utils.full_path(os.path.join(dataroot, dataset_dir_name(dataset_name)))
     output_dir = utils.full_path(pt_output_dir or \
                         os.path.join(output_dir, experiment_name)
                     , create=True)
