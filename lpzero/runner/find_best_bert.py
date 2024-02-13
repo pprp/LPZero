@@ -24,6 +24,9 @@ from lpzero.predictor.measures.synaptic_diversity import synaptic_diversity
 from lpzero.predictor.measures.synaptic_saliency import compute_synaptic_saliency
 from lpzero.predictor.measures.jacobian_score import jacobian_score_cosine
 from lpzero.predictor.measures.attention_confidence import compute_attention_confidence
+from lpzero.predictor.measures.attention_head_importance import compute_head_importance
+from lpzero.predictor.measures.softmax_confidence import compute_softmax_confidence
+from lpzero.predictor.measures.parameters import num_parameters
 
 configs = []
 with open('./data/BERT_benchmark.json', 'r') as f:
@@ -134,6 +137,12 @@ def find_best_w_predictive(inputs, proxy_type, device=None, num_sample=500):
             zc = jacobian_score_cosine(model, inputs)
         elif proxy_type == 'att_conf':
             zc = compute_attention_confidence(model, inputs)
+        elif proxy_type == 'head_imp':
+            zc = compute_head_importance(model, inputs)
+        elif proxy_type == 'softmax_conf':
+            zc = compute_softmax_confidence(model, inputs)
+        elif proxy_type == 'params':
+            zc = num_parameters(model)
         else: 
             raise NotImplementedError(f'Not support {proxy_type} proxy.')
               

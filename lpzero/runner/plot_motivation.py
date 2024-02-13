@@ -105,4 +105,5 @@ plt.legend()
 plt.ylim(0, max(df_spearman_sorted['Spearman’s ρ']) + 0.1)  # Add some space above the highest bar
 bar_plot.set(xlabel=None)
 # Show the plot
-plt.savefig('motivation_figure.png', dpi=200, bbox_inches='tight')
+plt.grid(axis='y', linestyle='--', alpha=0.7)
+plt.savefig('motivation_figure.png', dpi=300, bbox_inches='tight')
