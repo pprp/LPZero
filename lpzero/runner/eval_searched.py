@@ -8,6 +8,8 @@ from datasets import load_dataset
 from tqdm import tqdm
 from lpzero.predictor.measures.fisher import compute_fisher_per_weight
 from lpzero.predictor.measures.snip import compute_snip_per_weight 
+from lpzero.predictor.measures.grasp import compute_grasp_per_weight
+from lpzero.predictor.measures.synflow import compute_synflow_per_weight, compute_logsynflow_per_weight
 from lpzero.model.flexibert.modeling_electra import ElectraLayer, ElectraModel
 
 from lpzero.model.flexibert.modeling_electra import (
@@ -151,7 +153,11 @@ def fitness_proxy(inputs, proxy_type, device=None, num_samples=500):
         elif proxy_type == 'snip':
             zc = compute_snip_per_weight(model, inputs)
         elif proxy_type == 'grasp':
-            pass
+            zc = compute_grasp_per_weight(model, inputs)
+        elif proxy_type == 'synflow':
+            zc = compute_synflow_per_weight(model, inputs)
+        elif proxy_type == 'logsynflow':
+            zc = compute_logsynflow_per_weight(model, inputs)
         else: 
             raise NotImplementedError(f'Not support {proxy_type} proxy.')
                 
