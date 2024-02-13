@@ -32,6 +32,8 @@ from lpzero.predictor.measures.flops import get_model_flops
 from lpzero.datasets.lm_iterators import LMOrderedIterator
 from lpzero.model.mem_transformer.model_mem_transformer import MemTransformerLM
 from lpzero.model.hf_gpt2.model_hf_gpt2 import HfGPT2Flex
+from lpzero.model.flexibert.modeling_electra import ElectraLayer, ElectraModel
+
 
 def get_layer_metric_array(net, metric):
     metric_array = []
@@ -43,8 +45,8 @@ def get_layer_metric_array(net, metric):
     return metric_array
 
 
-def compute_synflow_per_weight(net, inputs, targets):
-    device = inputs.device
+def compute_synflow_per_weight(net, inputs, targets=None):
+    device = net.device
 
     # convert params to their abs. Keep sign for converting it back.
     @torch.no_grad()
@@ -69,13 +71,18 @@ def compute_synflow_per_weight(net, inputs, targets):
     net.zero_grad()
     net.double()
 
-    outputs = net(inputs, targets, mems=None)
 
     # TODO: should this be loss or logits?
     if isinstance(net, MemTransformerLM):
+        outputs = net(inputs, targets, mems=None)
         torch.sum(outputs).backward()
     elif isinstance(net, HfGPT2Flex):
+        outputs = net(inputs, targets, mems=None)
         torch.sum(outputs.logits).backward()
+    elif isinstance(net, ElectraModel):
+        outputs = net(**inputs).last_hidden_state 
+        loss = outputs.sum()
+        loss.backward()
     else:
         raise NotImplementedError
 
@@ -94,6 +101,61 @@ def compute_synflow_per_weight(net, inputs, targets):
 
     return grads_abs
 
+
+def compute_logsynflow_per_weight(net, inputs, targets=None):
+    device = net.device
+
+    # convert params to their abs. Keep sign for converting it back.
+    @torch.no_grad()
+    def linearize(net):
+        signs = {}
+        for name, param in net.state_dict().items():
+            signs[name] = torch.sign(param)
+            param.abs_()
+        return signs
+
+    # convert to orig values
+    @torch.no_grad()
+    def nonlinearize(net, signs):
+        for name, param in net.state_dict().items():
+            if "weight_mask" not in name:
+                param.mul_(signs[name])
+
+    # keep signs of all params
+    signs = linearize(net)
+
+    # Compute gradients with input of 1s
+    net.zero_grad()
+    net.double()
+
+
+    # TODO: should this be loss or logits?
+    if isinstance(net, MemTransformerLM):
+        outputs = net(inputs, targets, mems=None)
+        torch.sum(outputs).backward()
+    elif isinstance(net, HfGPT2Flex):
+        outputs = net(inputs, targets, mems=None)   
+        torch.sum(outputs.logits).backward()
+    elif isinstance(net, ElectraModel):
+        outputs = net(**inputs).last_hidden_state 
+        loss = outputs.sum()
+        loss.backward()
+    else:
+        raise NotImplementedError
+
+    # select the gradients that we want to use for search/prune
+    def logsynflow(layer):
+        if layer.weight.grad is not None:
+            return layer.weight * torch.abs(torch.log(layer.weight.grad))
+        else:
+            return torch.zeros_like(layer.weight)
+        
+    grads_abs = get_layer_metric_array(net, logsynflow)
+
+    # apply signs of all params
+    nonlinearize(net, signs)
+
+    return grads_abs
 
 def forward_crit(self, hidden, target=None, keep_order=False, output_loss=True, output_prediction_scores=False):
   '''
