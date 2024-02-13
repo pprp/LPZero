@@ -88,7 +88,7 @@ def parse_args():
     # num_sample
     parser.add_argument(
         '--num_sample',
-        default=50,
+        default=100,
         type=int,
         help='number of sample to be evaluate the ranking consistency',
     )
@@ -345,9 +345,12 @@ def main():
         json.dump(mem_dict, f)
     
 if __name__ == "__main__":
-    try: 
-        main()
-    except: 
-        extype, value, tb = sys.exc_info()
-        traceback.print_exc()
-        pdb.post_mortem(tb)
+    main()    
+
+# if __name__ == "__main__":
+#     try: 
+#         main()
+#     except: 
+#         extype, value, tb = sys.exc_info()
+#         traceback.print_exc()
+#         pdb.post_mortem(tb)

@@ -11,7 +11,7 @@ from lpzero.predictor.measures.snip import compute_snip_per_weight
 from lpzero.predictor.measures.grasp import compute_grasp_per_weight
 from lpzero.predictor.measures.synflow import compute_synflow_per_weight, compute_logsynflow_per_weight
 from lpzero.model.flexibert.modeling_electra import ElectraLayer, ElectraModel
-
+from lpzero.predictor.measures.grad_norm import get_grad_norm_arr
 from lpzero.model.flexibert.modeling_electra import (
     ElectraConfig,
     ElectraModel,
@@ -116,6 +116,8 @@ def fitness_spearman(inputs, structure, device=None, num_sample=500):
     return sp, kd
 
 def sum_arr(arr):
+    if isinstance(arr, torch.Tensor):
+        return torch.sum(arr).item()
     if isinstance(arr[0], (float, int)):
         return sum(arr)
     
@@ -158,12 +160,14 @@ def fitness_proxy(inputs, proxy_type, device=None, num_samples=500):
             zc = compute_synflow_per_weight(model, inputs)
         elif proxy_type == 'logsynflow':
             zc = compute_logsynflow_per_weight(model, inputs)
+        elif proxy_type == 'gradnorm':
+            zc = get_grad_norm_arr(model, inputs)
         else: 
             raise NotImplementedError(f'Not support {proxy_type} proxy.')
                 
         if isinstance(zc, list):
             zc = zc[0]
-        
+            
         zc = sum_arr(zc)        
 
         if is_anomaly(zc):

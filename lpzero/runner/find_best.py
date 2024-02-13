@@ -56,87 +56,6 @@ def find_best(inputs, structure, device=None, num_sample=500):
             best_scores = _score
     
     return best_gt, best_nas_config, best_scores
-        
-def fitness_spearman(inputs, structure, device=None, num_sample=500):
-    """structure is belong to popultion."""
-    device = device or torch.device(
-        'cuda' if torch.cuda.is_available() else 'cpu')
-    if structure.sp_score != -1:
-        return structure.sp_score
-
-    gt_score = []
-    zc_score = []
-
-    df = pd.read_csv('./BERT_results_activation.csv')
-
-    for i in tqdm(range(num_sample)):
-        nas_config = configs[i]['hparams']['model_hparam_overrides']['nas_config']
-
-        gt = configs[i]['scores']['glue']
-        # build a new model
-        config = ElectraConfig(
-            nas_config=nas_config,
-            num_hidden_layers=len(nas_config['encoder_layers']),
-            output_hidden_states=True,
-        )
-        model = ElectraModel(config)
-        model.to(device)
-        inputs.to(device)
-        zc = structure(model, inputs)
-
-        if is_anomaly(zc):
-            return -1
-
-        # early exit
-        if len(zc_score) > 3 and all_same(zc_score):
-            return -1
-
-        zc_score.append(zc)
-        gt_score.append(gt)
-
-        del model
-        if torch.cuda.is_available():
-            torch.cuda.empty_cache()
-
-        # gc.collect()
-
-    # TODO add inf check
-    try:
-        if len(zc_score) <= 1 or np.isnan(spearman(gt_score, zc_score)):
-            return -1
-    except TypeError as e:
-        import pdb
-        pdb.set_trace()
-
-    df['lpzero'] = zc_score
-    df.to_csv('./BERT_results_activation_3.csv', index=False)
-
-    # release memory
-    del inputs
-    torch.cuda.empty_cache()
-    # gc.collect()
-
-    sp = spearman(gt_score, zc_score)
-    if structure.sp_score == -1:
-        structure.sp_score = sp
-
-    # plot the result
-    plt.figure()
-    # z-score for zc_score
-    # zc_score = (zc_score - np.mean(zc_score)) / np.std(zc_score)
-    # min-max scale
-    zc_score = (zc_score - np.min(zc_score)) / \
-        (np.max(zc_score) - np.min(zc_score))
-    # filter pairs that zc_score is larger than 0.8
-    # gt_score = np.array(gt_score)[np.where(zc_score > 0.8)]
-    # zc_score = np.array(zc_score)[np.where(zc_score > 0.8)]
-    plt.scatter(gt_score, zc_score, marker='o', color='red')
-    plt.xlabel('Ground Truth')
-    plt.ylabel('Zero Cost (LPZero)')
-    plt.title(f'Spearman Correlation: {sp}')
-    plt.savefig(f'./output/{structure}_500.png')
-    return sp
-
 
 if __name__ == '__main__':
     inputs = generate_inputs()
@@ -190,7 +109,6 @@ if __name__ == '__main__':
     # TREE:(to_std_scalar-element_wise_pow|normalize-sigmoid)
     # BINARY:(element_wise_product) Input=['head', 'act'] Op=[[18, 3], [5, 12], 2]
 
-    # sp = fitness_spearman(inputs, struct, num_sample=500)
     gt, nas_config, best_score = find_best(inputs, struct)
 
     print(f'Ground Truth: {gt}')
