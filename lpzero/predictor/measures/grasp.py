@@ -18,7 +18,7 @@ import torch.nn as nn
 import torch.autograd as autograd
 import transformers
 
-from lpzero.model.flexibert.modeling_electra import ElectraLayer, ElectraModel
+from lpzero.model.flexibert.modeling_electra import ElectraModel
 from lpzero.model.hf_gpt2.model_hf_gpt2 import HfGPT2, HfGPT2Flex
 
 from . import measure
@@ -27,9 +27,8 @@ from ..p_utils import get_layer_metric_array
 
 @measure("grasp", bn=True, mode="param", copy_net=False)
 def compute_grasp_per_weight(
-    net, inputs, targets=None, mode='param', loss_fn=None, T=1, num_iters=1, split_data=1
-):
-
+    net, inputs, targets=None, mode='param'):
+    
     # get all applicable weights
     weights = []
     for layer in net.modules():
@@ -41,51 +40,43 @@ def compute_grasp_per_weight(
     # NOTE original code had some input/target splitting into 2
     # I am guessing this was because of GPU mem limit
     net.zero_grad()
-    N = inputs.shape[0]
-    for sp in range(split_data):
-        st = sp * N // split_data
-        en = (sp + 1) * N // split_data
 
-        # forward/grad pass #1
-        grad_w = None
-        if isinstance(net, (HfGPT2, HfGPT2Flex)):
-            loss, _, _, _ = net.forward(inputs[st:en, :], targets[st:en, :], mems=None)
-            loss = loss.float().mean().type_as(loss)
-        elif isinstance(net, ElectraModel):
-            output = net(**inputs).last_hidde_state 
-            output.backward(torch.ones_like(output))
-        
-        grad_w_p = autograd.grad(loss, weights, allow_unused=True)
-        
-        if grad_w is None:
-            grad_w = list(grad_w_p)
-        else:
-            for idx in range(len(grad_w)):
-                grad_w[idx] += grad_w_p[idx]
+    # forward/grad pass #1
+    grad_w = None
+    if isinstance(net, (HfGPT2, HfGPT2Flex)):
+        loss, _, _, _ = net.forward(inputs, targets, mems=None)
+        loss = loss.float().mean().type_as(loss)
+    elif isinstance(net, ElectraModel):
+        outputs = net(**inputs).last_hidden_state 
+        loss = outputs.sum()
+    
+    grad_w_p = autograd.grad(loss, weights, allow_unused=True)
+    
+    if grad_w is None:
+        grad_w = list(grad_w_p)
+    else:
+        for idx in range(len(grad_w)):
+            grad_w[idx] += grad_w_p[idx]
 
-    for sp in range(split_data):
-        st = sp * N // split_data
-        en = (sp + 1) * N // split_data
+    # forward/grad pass #2
+    if isinstance(net, (HfGPT2, HfGPT2Flex)):
+        loss, _, _, _ = net.forward(inputs, targets, mems=None)
+        loss = loss.float().mean().type_as(loss)
+    elif isinstance(net, ElectraModel):
+        outputs = net(**inputs).last_hidden_state 
+        loss = outputs.sum()
+    
+    grad_f = autograd.grad(loss, weights, create_graph=True, allow_unused=True)
 
-        # forward/grad pass #2
-        if isinstance(net, (HfGPT2, HfGPT2Flex)):
-            loss, _, _, _ = net.forward(inputs[st:en, :], targets[st:en, :], mems=None)
-            loss = loss.float().mean().type_as(loss)
-        elif isinstance(net, ElectraModel):
-            output = net(**inputs).last_hidde_state 
-            output.backward(torch.ones_like(output))
-        
-        grad_f = autograd.grad(loss, weights, create_graph=True, allow_unused=True)
-
-        # accumulate gradients computed in previous step and call backwards
-        z, count = 0, 0
-        for layer in net.modules():
-            if isinstance(layer, nn.Conv2d) or isinstance(layer, transformers.Conv1D) or isinstance(layer, nn.Linear):
-                if grad_w[count] is not None:
-                    z += (grad_w[count].data * grad_f[count]).sum()
-                    layer.compute += torch.prod(torch.tensor(grad_w[count].size())).item()
-                count += 1
-        z.backward()
+    # accumulate gradients computed in previous step and call backwards
+    z, count = 0, 0
+    for layer in net.modules():
+        if isinstance(layer, nn.Conv2d) or isinstance(layer, transformers.Conv1D) or isinstance(layer, nn.Linear):
+            if grad_w[count] is not None:
+                z += (grad_w[count].data * grad_f[count]).sum()
+                layer.compute += torch.prod(torch.tensor(grad_w[count].size())).item()
+            count += 1
+    z.backward()
 
     # compute final sensitivity metric and put in grads
     def grasp(layer):
