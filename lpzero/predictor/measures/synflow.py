@@ -95,7 +95,7 @@ def compute_synflow_per_weight(net, inputs, targets=None):
             return torch.zeros_like(layer.weight)
 
     grads_abs = get_layer_metric_array(net, synflow)
-
+    
     # apply signs of all params
     nonlinearize(net, signs)
 
@@ -137,16 +137,15 @@ def compute_logsynflow_per_weight(net, inputs, targets=None):
         outputs = net(inputs, targets, mems=None)   
         torch.sum(outputs.logits).backward()
     elif isinstance(net, ElectraModel):
-        outputs = net(**inputs).last_hidden_state 
-        loss = outputs.sum()
-        loss.backward()
+        output = net(**inputs).last_hidden_state 
+        output.backward(torch.ones_like(output))
     else:
         raise NotImplementedError
 
     # select the gradients that we want to use for search/prune
     def logsynflow(layer):
         if layer.weight.grad is not None:
-            return layer.weight * torch.abs(torch.log(layer.weight.grad))
+            return layer.weight * torch.abs(torch.log(torch.abs(layer.weight.grad)))
         else:
             return torch.zeros_like(layer.weight)
         
