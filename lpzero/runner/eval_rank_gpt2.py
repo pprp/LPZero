@@ -2,7 +2,7 @@ import transformers
 from lpzero.predictor import predictive
 from lpzero.datasets.distributed_utils.data_utils import get_lm_corpus
 from lpzero.predictor.measures.flops import get_model_flops
-
+from tqdm import tqdm 
 
 import torch.nn as nn
 import torch
@@ -18,6 +18,7 @@ import matplotlib.pyplot as plt
 from lpzero.utils.rank_consistency import kendalltau
 
 from lpzero.predictor.measures.synflow import get_synflow_scores
+from lpzero.predictor.measures.lpzero import get_lpzero_scores
 from lpzero.model.model_loader import load_model_from_config
 
 plt.rcParams.update({"font.size": 18})
@@ -60,8 +61,10 @@ def get_scores(args, exp_name, tr_iter, method="snip", compute_cost=False):
     count = 1
     yaml_file = os.path.join(path_to_results, f"{method}_scores_seed_{args.seed}.yaml")
     cost_file = os.path.join(path_to_results, f"{method}_cost.yaml")
+    print("computing scores for method ", method)
     if not os.path.exists(yaml_file) or (compute_cost and not os.path.exists(cost_file)):
-        for _f in set(files):
+        print(f'begin.... ')
+        for _f in tqdm(set(files)):
             if "model_config.yaml" in _f:
                 idx =  re.search('(config_[0-9]+)', _f).span()[0]
                 job = _f[idx:]
@@ -99,6 +102,7 @@ def get_scores(args, exp_name, tr_iter, method="snip", compute_cost=False):
 
 
 def get_statistics(method, results_gt, scores, nparams_dict, topk_list):
+    print('='*3, method, '='*3)
     old_keys = list(scores[method].keys())
     for k in old_keys:
         if "_config" in k:
@@ -362,12 +366,14 @@ if __name__ == "__main__":
 
     # "jacob_cov_relu"
     # "jacob_cov"
-    methods = ["snip", "grad_norm", "fisher", "grasp", "synflow", "lpzero"]
-    # methods = ["lpzero"]
+    # methods = ["snip", "grad_norm", "fisher", "grasp", "synflow", "lpzero"]
+    methods = ["lpzero"]
     for method in methods:
         print(f"------------ {method} ------------")
         if method == 'synflow':
             get_synflow_scores(args, args.exp_name)
+        elif method == 'lpzero':
+            get_lpzero_scores(args, args.exp_name, train_itr)
         else:
             get_scores(args, args.exp_name, train_itr, method=method, compute_cost=args.get_cost)
 

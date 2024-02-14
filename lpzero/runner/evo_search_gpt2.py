@@ -7,9 +7,6 @@ import math
 import random
 from typing import Union
 import collections
-import sys  
-import pdb
-import traceback 
 
 import re 
 import yaml
@@ -19,7 +16,10 @@ import torch
 from datasets import load_dataset
 from loguru import logger
 from torch import Tensor
+from tqdm import tqdm 
 
+torch.backends.cudnn.enable = True
+torch.backends.cudnn.benchmark = True
 
 from lpzero.structures import GraphStructure, LinearStructure, TreeStructure
 from lpzero.utils.rank_consistency import spearman
@@ -101,7 +101,6 @@ def parse_args():
     parser.add_argument("--seed", type=int, default=1111, help="Random seed")
     parser.add_argument("--plot", action="store_true", help="plot the spearman corr and common ratio")
     parser.add_argument("--method", type=str, default="snip", help="zero-cost method to use")
-    parser.add_argument("--cuda", action="store_true", help="use gpu for score calculation")
 
     parser.add_argument("--batch_size", type=int, default=16, help="Global batch size")
     parser.add_argument("--dataset", type=str, default="wt103", choices=["wt103", "lm1b"], help="Dataset name",)
@@ -115,7 +114,8 @@ def parse_args():
     parser.add_argument("--write_freq", type=int, default=100, help="frequency of write to file")
     
     args = parser.parse_args()
-    args.device = torch.device("cuda" if args.cuda else "cpu")
+    args.device = torch.device("cpu")
+    # torch.device("cuda" if torch.cuda.is_available() else "cpu")
     return args
 
 
@@ -151,7 +151,8 @@ def convert_path_to_config_format(path: str) -> str:
 def get_scores(structure, tr_iter=None):
     assert structure is not None, "structure is not defined"
     path_to_results = './saved_logs/random_GPT2_wt103'
-    device = torch.device("cuda" if args.cuda else "cpu")
+    # device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+    device = torch.device("cpu")
     inputs, targets = get_batch_data(tr_iter, 1, device)
     
     files = []
@@ -173,7 +174,7 @@ def get_scores(structure, tr_iter=None):
     # random sample 50 architectures to evaluate the ranking consistency
     files = random.sample(files, args.num_sample)
     
-    for _f in set(files):
+    for _f in tqdm(set(files)):
         if "model_config.yaml" in _f:
             idx =  re.search('(config_[0-9]+)', _f).span()[0]
             with open(_f, "r") as f:
@@ -191,7 +192,7 @@ def get_scores(structure, tr_iter=None):
             del model 
             import gc 
             gc.collect()
-            torch.cuda.empty_cache()
+            # torch.cuda.empty_cache()
     
     sp = spearman(gt_list, zc_list)
     kd = kendalltau(gt_list, zc_list)
@@ -311,7 +312,8 @@ def main():
         eval_batch_size = 16
         eval_tgt_len = 32
         
-    device = torch.device("cuda" if args.cuda else "cpu")
+    # device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+    device = torch.device("cpu")
 
     data = './data/wikitext/wikitext-103'
     cache_dir = './data/cachedir'

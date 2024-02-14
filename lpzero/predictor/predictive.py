@@ -139,7 +139,8 @@ def find_measures(
     def sum_arr(arr):
         if not arr:
             return 0
-
+        if isinstance(arr, (float, int)):
+            return arr 
         if isinstance(arr[0], (float, int)):
             return sum(arr)
         elif isinstance(arr[0], torch.Tensor):
