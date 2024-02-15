@@ -237,6 +237,8 @@ def plot(args, methods):
         "lpzero": "LPZero",
         "num_parameters": "# Params",
         "synaptic_diversity": "Synaptic Diversity",
+        "jacobian_cosine": "Jacobian Cosine",
+        "attention_confidence": "Attention Confidence",
     }
     plt.figure(figsize=(6, 4))
     for i, m in enumerate(common_ratios.keys()):
@@ -364,6 +366,8 @@ if __name__ == "__main__":
         print(f"------------ {method} ------------")
         if method == 'synflow':
             get_synflow_scores(args, args.exp_name)
+        elif method == 'logsynflow':
+            get_synflow_scores(args, args.exp_name, use_log=True)
         elif method == 'lpzero':
             get_lpzero_scores(args, args.exp_name, train_itr)
         else:

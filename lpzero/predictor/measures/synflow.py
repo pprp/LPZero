@@ -45,9 +45,7 @@ def get_layer_metric_array(net, metric):
     return metric_array
 
 
-def compute_synflow_per_weight(net, inputs, targets=None):
-    device = net.device
-
+def compute_synflow_per_weight(net, inputs, targets=None, use_log=False):
     # convert params to their abs. Keep sign for converting it back.
     @torch.no_grad()
     def linearize(net):
@@ -93,8 +91,17 @@ def compute_synflow_per_weight(net, inputs, targets=None):
             # return torch.abs(layer.weight.grad)
         else:
             return torch.zeros_like(layer.weight)
+        
+    def logsynflow(layer):
+        if layer.weight.grad is not None:
+            return layer.weight * torch.abs(torch.log(torch.abs(layer.weight.grad)))
+        else:
+            return torch.zeros_like(layer.weight)
 
-    grads_abs = get_layer_metric_array(net, synflow)
+    if use_log:
+        grads_abs = get_layer_metric_array(net, logsynflow)
+    else:
+        grads_abs = get_layer_metric_array(net, synflow)
     
     # apply signs of all params
     nonlinearize(net, signs)
@@ -295,10 +302,11 @@ def forward_synflow_memformer(self, input_ids:torch.Tensor, labels:Optional[torc
     return out
 
 
-def get_synflow_scores(args, exp_name):
+def get_synflow_scores(args, exp_name, use_log=False):
     path_to_results = exp_name
-    yaml_file_scores = os.path.join(path_to_results, "synflow_scores_seed_{}.yaml".format(args.seed))
-    yaml_file_cost = os.path.join(path_to_results, "synflow_cost.yaml")
+    save_file_name = 'synflow' if not use_log else 'logsynflow'
+    yaml_file_scores = os.path.join(path_to_results, "{}_scores_seed_{}.yaml".format(save_file_name, args.seed))
+    yaml_file_cost = os.path.join(path_to_results, "{}_cost.yaml".format(save_file_name))
     calc_scores = not os.path.exists(yaml_file_scores)
     calc_costs = args.get_cost and not os.path.exists(yaml_file_cost)
 
@@ -344,7 +352,7 @@ def get_synflow_scores(args, exp_name):
                 diter = LMOrderedIterator(data, B, tgt_len, device=device, ext_len=ext_len)
                 if calc_scores:
                     for idx, (inp, tgt, seqlen, _) in enumerate(diter):
-                        grads_abs = compute_synflow_per_weight(model, inp, tgt)
+                        grads_abs = compute_synflow_per_weight(model, inp, tgt, use_log)
                         score = np.sum([torch.sum(g).detach().numpy() for g in grads_abs])
                         break
                     scores[config_name] = score.tolist()

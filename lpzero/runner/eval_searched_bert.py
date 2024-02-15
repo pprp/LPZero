@@ -21,7 +21,7 @@ from lpzero.structures import GraphStructure, LinearStructure, TreeStructure
 from lpzero.utils.rank_consistency import spearman, kendalltau
 from lpzero.utils.preprocess_openwebtext import generate_inputs
 from lpzero.predictor.measures.activation_distance import compute_act_dist
-
+from lpzero.predictor.measures.eznas import compute_eznas
 configs = []
 with open('./data/BERT_benchmark.json', 'r') as f:
     configs = json.load(f)
@@ -117,6 +117,8 @@ def fitness_spearman(inputs, structure, device=None, num_sample=500):
     return sp, kd
 
 def sum_arr(arr):
+    if isinstance(arr, (float, int)):
+        return arr 
     if isinstance(arr, torch.Tensor):
         return torch.sum(arr).item()
     if isinstance(arr[0], (float, int)):
@@ -165,12 +167,15 @@ def fitness_proxy(inputs, proxy_type, device=None, num_samples=500):
             zc = get_grad_norm_arr(model, inputs)
         elif proxy_type == 'act_dist':
             zc = compute_act_dist(model, inputs)
+        elif proxy_type == 'eznas':
+            zc = compute_eznas(model, inputs)
         else: 
             raise NotImplementedError(f'Not support {proxy_type} proxy.')
                 
         if isinstance(zc, list):
             zc = zc[0]
-            
+        
+        print(zc)
         zc = sum_arr(zc)        
 
         if is_anomaly(zc):
