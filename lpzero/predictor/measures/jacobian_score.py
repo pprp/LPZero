@@ -14,8 +14,14 @@ def jacobian_score(model, inputs):
 
 
 @measure('jacobian_cosine')
-def jacobian_score_cosine(model, inputs, *args, **kwargs):
-    output = model(**inputs).last_hidden_state
-    output.backward(torch.ones_like(output))
-    jacobs = model.embeddings.position_embeddings.weight.grad.detach()
+def jacobian_score_cosine(model, inputs, targets, *args, **kwargs):
+    if isinstance(model, ElectraModel):
+        outputs = model(**inputs).last_hidden_state
+        outputs.backward(torch.ones_like(outputs))
+        jacobs = model.embeddings.position_embeddings.weight.grad.detach()
+    elif isinstance(model, (HfGPT2, HfGPT2Flex)):
+        loss, _, _, _ = model.forward(inputs, targets, mems=None)
+        loss = loss.float().mean().type_as(loss)
+        loss.backward()
+        jacobs = model.model.transformer.wpe.weight.grad.detach()
     return cosine(jacobs)
