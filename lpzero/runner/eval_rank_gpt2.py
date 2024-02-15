@@ -233,8 +233,10 @@ def plot(args, methods):
         "grasp": "Grasp",
         "jacob_cov_relu": "ReLU",
         "synflow": "Synflow",
-        "nparams": "# Params",
-        "lpzero": "LPZero"
+        "nparams": "# D.Params",
+        "lpzero": "LPZero",
+        "num_parameters": "# Params",
+        "synaptic_diversity": "Synaptic Diversity",
     }
     plt.figure(figsize=(6, 4))
     for i, m in enumerate(common_ratios.keys()):
@@ -293,20 +295,10 @@ def cost_fn(method, model, tr_iter, device):
         cost = 3 * total_flops
     elif method == "jacob_cov_relu":
         cost = total_flops + model.compute
-        # n_relus = 0
-        # found_compute_cost = 0
-        # for layer in model.modules():
-        #   if 'ReLU' in str(type(layer)):
-        #     n_relus += 1
-        #   if hasattr(layer, 'compute'):
-        #     cost += layer.compute
-        #     found_compute_cost += 1
-        # assert found_compute_cost == n_relus, f'{found_compute_cost}, {n_relus}'
     elif method == 'lpzero':
-        cost = total_flops * 2 
+        cost = total_flops * 2  
     else:
-        raise NotImplementedError
-
+        cost = 0
     return cost
 
 
@@ -367,7 +359,7 @@ if __name__ == "__main__":
     # "jacob_cov_relu"
     # "jacob_cov"
     # methods = ["snip", "grad_norm", "fisher", "grasp", "synflow", "lpzero"]
-    methods = ["lpzero"]
+    methods = [args.method]
     for method in methods:
         print(f"------------ {method} ------------")
         if method == 'synflow':

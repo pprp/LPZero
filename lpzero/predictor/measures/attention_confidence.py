@@ -5,6 +5,8 @@ from lpzero.model.flexibert.modeling_electra import (
     ElectraModel,
 )
 
+from . import measure
+
 # Attention Confidence metric (for both head and softmax)
 def attention_confidence(outputs):
     metric_array = []
@@ -30,7 +32,8 @@ def attention_confidence_normalized(outputs):
 
     return summed.detach().item()
 
-def compute_attention_confidence(model, inputs):
+@measure('attention_confidence')
+def compute_attention_confidence(model, inputs, *args, **kwargs):
     head_outputs = []
 
     def head_hook(module, input, output):

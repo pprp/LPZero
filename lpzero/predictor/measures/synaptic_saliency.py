@@ -1,7 +1,7 @@
 import torch
 
 from lpzero.model.flexibert.modeling_electra import ElectraLayer
-
+from . import measure
 
 # Synaptic saliency metric
 def synaptic_saliency(model):
@@ -25,7 +25,8 @@ def synaptic_saliency(model):
 
     return summed.detach().item()
 
-def compute_synaptic_saliency(model, inputs):
+@measure('synaptic_saliency')
+def compute_synaptic_saliency(model, inputs, *args, **kwargs):
     outputs = model(**inputs).last_hidden_state
     outputs.backward(torch.ones_like(outputs))
     return synaptic_saliency(model)

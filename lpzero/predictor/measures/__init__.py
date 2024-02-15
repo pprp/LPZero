@@ -42,15 +42,13 @@ def load_all():
     from . import jacob_cov
     from . import plain
     from . import jacob_cov_relu
-    # from . import lpzero
-    from .activation_distance import activation_distance, activation_distance_normalized
-    from .attention_confidence import attention_confidence, attention_confidence_normalized
-    from .attention_head_importance import head_importance, head_importance_normalized
-    from .jacobian_covariance import covariance
-    from .jacobian_score import jacobian_score, jacobian_score_cosine
-    from .parameters import num_parameters
-    from .synaptic_diversity import synaptic_diversity, synaptic_diversity_normalized
-    from .synaptic_saliency import synaptic_saliency, synaptic_saliency_normalized
+    from . import parameters
+    from . import synaptic_diversity
+    from . import synaptic_saliency
+    from . import activation_distance
+    from . import attention_confidence
+    from . import attention_head_importance
+    from . import jacobian_score
 
 
 # TODO: should we do that by default?

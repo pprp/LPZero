@@ -49,3 +49,7 @@ def synaptic_diversity_normalized(model):
     summed /= len(metric_array)
 
     return summed.detach().item()
+
+@measure('synaptic_diversity')
+def compute_synaptic_diversity(model, *args, **kwargs):
+    return synaptic_diversity(model)

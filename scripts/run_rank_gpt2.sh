@@ -1,8 +1,72 @@
 #!/bin/bash 
 
 
+#num_parameters
+METHOD=num_parameters
 CUDA_VISIBLE_DEVICES=7 python lpzero/runner/eval_rank_gpt2.py \
-    --exp_name ./saved_logs/random_GPT2_wt103 --plot --get_cost
-     > ./logs/rank_corr.log
+    --method $METHOD \
+    --exp_name ./saved_logs/random_GPT2_wt103 --plot --get_cost \
+     > ./logs/rank_corr_${METHOD}.log
 
-# tail -f rank_corr.log
+#synaptic_diversity 
+METHOD=synaptic_diversity
+CUDA_VISIBLE_DEVICES=6 python lpzero/runner/eval_rank_gpt2.py \
+    --method $METHOD \
+    --exp_name ./saved_logs/random_GPT2_wt103 --plot --get_cost \
+     > ./logs/rank_corr_${METHOD}.log
+
+#synaptic_saliency 
+METHOD=synaptic_saliency
+CUDA_VISIBLE_DEVICES=5 python lpzero/runner/eval_rank_gpt2.py \
+    --method $METHOD \
+    --exp_name ./saved_logs/random_GPT2_wt103 --plot --get_cost \
+     > ./logs/rank_corr_${METHOD}.log
+
+# activation_distance 
+METHOD=activation_distance
+CUDA_VISIBLE_DEVICES=4 python lpzero/runner/eval_rank_gpt2.py \
+    --method $METHOD \
+    --exp_name ./saved_logs/random_GPT2_wt103 --plot --get_cost \
+     > ./logs/rank_corr_${METHOD}.log
+
+# jacobian_cosine
+METHOD=jacobian_cosine
+CUDA_VISIBLE_DEVICES=3 python lpzero/runner/eval_rank_gpt2.py \
+    --method $METHOD \
+    --exp_name ./saved_logs/random_GPT2_wt103 --plot --get_cost \
+     > ./logs/rank_corr_${METHOD}.log 
+
+# lpzero 
+METHOD=lpzero
+CUDA_VISIBLE_DEVICES=2 python lpzero/runner/eval_rank_gpt2.py \
+    --method $METHOD \
+    --exp_name ./saved_logs/random_GPT2_wt103 --plot --get_cost \
+     > ./logs/rank_corr_${METHOD}.log
+
+# attention_confidence 
+METHOD=attention_confidence
+CUDA_VISIBLE_DEVICES=1 python lpzero/runner/eval_rank_gpt2.py \
+    --method $METHOD \
+    --exp_name ./saved_logs/random_GPT2_wt103 --plot --get_cost \
+     > ./logs/rank_corr_${METHOD}.log
+
+# attention importance 
+METHOD=attention_importance
+CUDA_VISIBLE_DEVICES=0 python lpzero/runner/eval_rank_gpt2.py \
+    --method $METHOD \
+    --exp_name ./saved_logs/random_GPT2_wt103 --plot --get_cost \
+     > ./logs/rank_corr_${METHOD}.log
+
+# head_importance 
+METHOD=head_importance
+CUDA_VISIBLE_DEVICES=7 python lpzero/runner/eval_rank_gpt2.py \
+    --method $METHOD \
+    --exp_name ./saved_logs/random_GPT2_wt103 --plot --get_cost \
+     > ./logs/rank_corr_${METHOD}.log
+
+# head_confidence
+METHOD=head_confidence
+CUDA_VISIBLE_DEVICES=6 python lpzero/runner/eval_rank_gpt2.py \
+    --method $METHOD \
+    --exp_name ./saved_logs/random_GPT2_wt103 --plot --get_cost \
+     > ./logs/rank_corr_${METHOD}.log

@@ -49,8 +49,8 @@ def head_importance_normalized(model):
 
     return summed.detach().item()
 
-
-def compute_head_importance(model, inputs):
+@measure('head_importance')
+def compute_head_importance(model, inputs, *args, **kwargs):
     model.zero_grad()
     outputs = model(**inputs).last_hidden_state
     outputs.backward(torch.ones_like(outputs))
