@@ -49,6 +49,7 @@ def load_all():
     from . import attention_confidence
     from . import attention_head_importance
     from . import jacobian_score
+    from . import eznas 
 
 
 # TODO: should we do that by default?
