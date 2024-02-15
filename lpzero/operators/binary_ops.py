@@ -101,6 +101,13 @@ def binary_operation(A, B, idx=None):
     # 10
     if idx is None:
         idx = random.choice(range(len(BINARY_KEYS)))
+    
+    if A is None and B is None:
+        raise ValueError('A and B cannot be both None')
+    if A is None:
+        return B
+    if B is None:
+        return A
 
     assert idx < len(BINARY_KEYS)
 

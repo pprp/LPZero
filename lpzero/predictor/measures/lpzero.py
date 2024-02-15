@@ -9,6 +9,12 @@ import os
 # from lpzero.operators.zc_inputs import compute_weight, compute_gradient
 from lpzero.structures import TreeStructure
 import yaml 
+import re 
+import numpy as np 
+
+from lpzero.model.model_loader import load_model_from_config
+from lpzero.model.hf_gpt2.model_hf_gpt2 import HfGPT2Flex
+
 
 def get_head_metric_array(net):
     head_outputs = []
@@ -44,41 +50,16 @@ def get_act_metric_array(net, inputs, targets):
     return act_outputs
 
 def get_lpzero(net, inputs, targets=None, loss_fn=None, split_data=1, skip_grad=False):        
-    # head_outputs = get_head_metric_array(net)
-    # act_outputs = get_act_metric_array(net, inputs, targets)
-
-    # N = inputs.shape[0]
-    # for sp in range(split_data):
-    #     st = sp * N // split_data
-    #     en = (sp + 1) * N // split_data
-
-    #     if isinstance(net, ElectraModel):
-    #         output = net(inputs).last_hidden_state 
-    #         output.backward(torch.ones_like(output))
-    #     else: # GPT-2
-    #         loss, _, _, _ = net.forward(inputs[st:en, :], targets[st:en, :], mems=None)
-    #         loss = loss.float().mean().type_as(loss)
-    #         loss.backward()
-
     # lpzero
     # INPUT:(weight, grad)TREE:(element_wise_pow|l1_norm|softmax|element_wise_pow)BINARY:(element_wise_sum)
     
-    # weight_outputs = compute_weight(net, inputs, targets)
-    # grad_outputs = compute_gradient(net, inputs, targets)
+    # candidate 
+    # genotype = {
+    #     'input_geno': ['grad', 'weight'],
+    #     'op_geno': [[16, 2], [17, 1], 0]
+    # }
     
-    # A1, A2 = weight_outputs, grad_outputs
-    # A1 = [unary_operation(a, 3) for a in A1]
-    # A1 = [unary_operation(a, 10) for a in A1]
-    # A2 = [unary_operation(a, 11) for a in A2]
-    # A2 = [unary_operation(a, 3) for a in A2]
-    
-    # A = []
-    # for a1, a2 in zip(A1, A2):
-    #     a1 = convert_to_float(a1)
-    #     a2 = convert_to_float(a2)
-    #     A.append(binary_operation(a1, a2, 0))
-    
-    genotype = {
+    genotype = { # current best 
         'input_geno': ['weight', 'grad'],
         'op_geno': [[3, 10], [11, 3], 0]
     }
@@ -86,17 +67,29 @@ def get_lpzero(net, inputs, targets=None, loss_fn=None, split_data=1, skip_grad=
     struct.genotype = genotype 
     
     print(f'current struct: {struct}')
-    
     output = struct(net, inputs, targets)
     return output 
 
 
-def get_synflow_scores(args, exp_name):
+def get_batch_data(train_iter, num_batches=1):
+    traindata = []
+    for batch, (data, target, seq_len, _) in enumerate(train_iter, start=1):
+        if batch > num_batches:
+            break
+        traindata.append((data, target))
+
+    inputs = torch.cat([a for a, _ in traindata], dim=-1)
+    targets = torch.cat([b for _, b in traindata], dim=-1)
+    return inputs, targets
+
+def get_lpzero_scores(args, exp_name, tr_iter):
     path_to_results = exp_name
     yaml_file_scores = os.path.join(path_to_results, "lpzero_scores_seed_{}.yaml".format(args.seed))
     yaml_file_cost = os.path.join(path_to_results, "lpzero_cost.yaml")
     calc_scores = not os.path.exists(yaml_file_scores)
     calc_costs = args.get_cost and not os.path.exists(yaml_file_cost)
+    
+    inputs, targets = get_batch_data(tr_iter, 1)
 
     device = torch.device("cpu")
 
@@ -121,40 +114,16 @@ def get_synflow_scores(args, exp_name):
 
                 with open(_f, "r") as f:
                     model_config = yaml.full_load(f)
+
                 model = load_model_from_config(args.model_type, model_config)
                 model.n_token = model_config["n_token"]
+                model.to(device)
+                
+                zc = get_lpzero(model, inputs, targets)
 
-                if isinstance(model, MemTransformerLM):
-                    model._forward = types.MethodType(_forward_synflow_memformer, model)
-                    model.forward = types.MethodType(forward_synflow_memformer, model)
-                    model.crit.forward = types.MethodType(forward_crit, model.crit)
-
-                elif isinstance(model, HfGPT2Flex):
-                    model.forward = types.MethodType(forward_synflow_gpt, model)
-                    model.model.lm_head.forward = types.MethodType(forward_crit, model.model.lm_head)
-
-                B = 1
-                tgt_len, mem_len, ext_len = (model_config["tgt_len"], model_config["mem_len"], model_config["ext_len"],)
-                data_len = tgt_len
-                data = torch.ones(data_len * B).to(device, torch.long)
-                diter = LMOrderedIterator(data, B, tgt_len, device=device, ext_len=ext_len)
-                if calc_scores:
-                    for idx, (inp, tgt, seqlen, _) in enumerate(diter):
-                        grads_abs = compute_synflow_per_weight(model, inp, tgt)
-                        score = np.sum([torch.sum(g).detach().numpy() for g in grads_abs])
-                        break
-                    scores[config_name] = score.tolist()
-                if calc_costs:
-                    model.eval()
-                    with torch.no_grad():
-                        for _, (inp, tgt, _, _) in enumerate(diter):
-                            curr_flops = get_model_flops(model, inp, tgt)
-                            total_flops = np.sum([curr_flops[k] for k in ["Attn", "FFN", "Sftmax"]]).tolist()
-                            break
-                    costs[config_name] = 3 * total_flops
-                    print(count, config_name, 'score:', scores[config_name], 'FLOPS:', costs[config_name])
-                else:
-                    print(count, config_name, 'score:', scores[config_name])
+                scores[config_name] = zc
+                
+                print(count, config_name, 'score:', scores[config_name])
                 count += 1
 
     if calc_scores:

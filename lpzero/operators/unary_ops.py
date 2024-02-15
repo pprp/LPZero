@@ -31,6 +31,7 @@ UNARY_KEYS = (
     'to_mean_scalar',
     'to_std_scalar',
     'no_op',
+    'disconnect'
 )
 SCALAR_KEYS = ('to_mean_scalar', 'to_std_scalar')
 
@@ -51,6 +52,8 @@ def sample_unary_key_by_prob(probability=None):
 
 # unary operation
 
+def disconnect(A: ALLTYPE) -> ALLTYPE:
+    return None # type: ignore
 
 def no_op(A: ALLTYPE) -> ALLTYPE:
     return A
