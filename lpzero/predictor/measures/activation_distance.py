@@ -1,5 +1,10 @@
 import torch
 from . import measure
+import transformers 
+
+
+from lpzero.utils.modeling_electra import ElectraLayer, ElectraModel
+from lpzero.model.hf_gpt2.model_hf_gpt2 import HfGPT2, HfGPT2Flex
 
 
 # Activation Distance metric
@@ -39,36 +44,29 @@ def activation_distance_normalized(outputs):
 @measure("activation_distance")
 def compute_act_dist(net, inputs, targets=None, loss_fn=None, mode=None,
                      split_data=1):
-    device = net.device
+    if hasattr(net, 'device'):
+        device = net.device
+    if hasattr(inputs, 'device'):
+        device = inputs.device
+    
 
     net.train()
-    all_hooks = []
-
+    activation_outputs = []
+    
+    def activation_hook(module, input, output):
+        activation_outputs.append(output)
+    
     for layer in net.modules():
-        # convolution and transformer layers
-        if isinstance(layer, torch.nn.Conv2d) or isinstance(layer, torch.nn.Linear):
-            # variables/op needed for fisher computation
-            layer.act = 0.0
-            metric_array = []
-            # function to call during backward pass (hooked on identity op at output of layer)
-            def hook_factory(layer):
-                def hook(module, grad_input, grad_output):
-                    act = grad_output[0].detach()
-                    act = act.view(act.size(0), -1)
-                    x = (act > 0).float()
-                    K = x @ x.t()
-                    K2 = (1.0 - x) @ (1.0 - x.t())
-                    
-                    layer.act = act
-                return hook
+        if isinstance(layer, ElectraLayer):
+            sublayer = layer.intermediate.intermediate_act_fn.register_forward_hook(activation_hook)
+        elif isinstance(layer, torch.nn.Linear) or isinstance(layer, transformers.Conv1D):
+            sublayer = layer.register_forward_hook(activation_hook)
 
-            hook = layer.register_backward_hook(hook_factory(layer))
-            all_hooks.append(hook)
 
     with torch.no_grad():
-        outputs = net(**inputs).last_hidden_state
+        if isinstance(net, ElectraModel):
+            outputs = net(**inputs).last_hidden_state
+        elif isinstance(net, (HfGPT2, HfGPT2Flex)):
+            loss, _, _, _ = net.forward(inputs, targets, mems=None)
 
-    for hook in all_hooks:
-        hook.remove()
-
-    return outputs
+    return activation_distance(activation_outputs)
