@@ -62,6 +62,7 @@ def compute_eznas(model, inputs, targets=None, *args, **kwargs):
         _g = torch.sign(_g) # sign 
         _g = _g @ _g.t()
         sign, _g = torch.linalg.slogdet(_g) # slogdet
+        # _g = torch.logdet(_g + 1e-6) # slogdet
         _g = F.sigmoid(_g) # sigmoid 
         _g = torch.norm(_g, p='fro') # frobenius-norm
         return _g

@@ -150,7 +150,7 @@ class TreeStructure(BaseStructure):
                     a1, a2, self._genotype['op_geno'][2]))
 
         # except Exception as e:
-        #     print('GOT ERROR in TREE STRUCTURE:', e)
+        #     print('
         #     return -1
 
         if return_all:

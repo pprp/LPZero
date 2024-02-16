@@ -2,12 +2,16 @@ import re
 import matplotlib.pyplot as plt
 import numpy as np
 import random 
+import seaborn as sns
+
+custom_palette = sns.color_palette(["#34495e", "#e74c3c", "#2ecc71", "#95a5a6"])
+sns.set_palette(custom_palette)
 
 file_list = [
-    'logs/evo_search_ablation_unary_number_NUNARY_2_run0.log',
-    'logs/evo_search_ablation_unary_number_NUNARY_3_run1.log',
-    'logs/evo_search_ablation_unary_number_NUNARY_4_run2.log',
-    'logs/evo_search_ablation_unary_number_NUNARY_5_run3.log',
+    'logs/ablation/evo_search_ablation_unary_number_NUNARY_2_run0.log',
+    'logs/ablation/evo_search_ablation_unary_number_NUNARY_3_run1.log',
+    'logs/ablation/evo_search_ablation_unary_number_NUNARY_4_run2.log',
+    'logs/ablation/evo_search_ablation_unary_number_NUNARY_5_run3.log',
 ]
 
 def sample_with_sp_rule(sp_list, sample_size):
@@ -71,12 +75,12 @@ def plot_average_sp_and_score(collected_data, file_path):
     plt.figure(figsize=(5, 3))
 
     # Plot lines with valid data points, using 'None' values to skip invalid points in the plot
-    plt.plot(valid_score_and_offspring, label='Score SP', marker='o', linestyle='-', color='green')
-    plt.plot(valid_best_sp, label='Best SP', marker='.', linestyle='-', color='red')
+    plt.plot(valid_score_and_offspring, label='Score SP', marker='o', linestyle='-', markersize=4)
+    plt.plot(valid_best_sp, label='Best SP', linestyle='-', linewidth=2)
 
     # Adding title, labels, and legend
     plt.xlabel('Iteration')
-    plt.ylabel('Value')
+    plt.ylabel('Spearman')
     plt.ylim(-1, 1)
     plt.legend()
     
@@ -86,8 +90,7 @@ def plot_average_sp_and_score(collected_data, file_path):
     plt.tight_layout()
 
     # Show plot
-    plt.savefig(file_path, dpi=300)
-    
+    plt.savefig(file_path, dpi=300, bbox_inches='tight')
     plt.clf()
 
 

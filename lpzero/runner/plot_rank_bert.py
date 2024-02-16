@@ -15,7 +15,7 @@ mpl.rcParams.update({'font.size': 13})
 mpl.rc('xtick', labelsize=13)
 mpl.rc('ytick', labelsize=13)
 
-IS_RANK=True
+IS_RANK=False
 
 def plot_correlations_from_csv(csv_file_path):
     # Read the CSV data into a DataFrame
@@ -34,7 +34,7 @@ def plot_correlations_from_csv(csv_file_path):
         ('Head Confidence', 'Head Confidence'),
         ('Head Softmax Confidence', 'Head Softmax Confidence'),
         ('Number of Parameters', 'Number of Parameters'),
-        ('lpzero', 'lpzero'),
+        ('LPZero Score', 'lpzero'),
     ]
 
     # Get list of titles from headers
@@ -57,7 +57,6 @@ def plot_correlations_from_csv(csv_file_path):
         
         cmap = mcolors.ListedColormap(cmap)
             
-        # subplot = axs[(i - 1) // 3, (i - 1) % 3]
         subplot = axs.flatten()[i]
         subplot.yaxis.set_major_formatter(ScalarFormatter())
 
@@ -83,7 +82,7 @@ def plot_correlations_from_csv(csv_file_path):
             linewidth=0.5,
         )
         subplot.set_xlabel('GLUE Score')
-        subplot.set_ylabel(titles[i - 1])
+        subplot.set_ylabel(titles[i])
         subplot.set_title(
             # "\n" + titles[i - 1] + "\n
             'τ: {:.3f}    ρ: {:.3f}'.format(tau, rho)
@@ -96,10 +95,10 @@ def plot_correlations_from_csv(csv_file_path):
         fig.colorbar(sm, ax=subplot, fraction=0.046, pad=0.05)
 
     # Hide any unused subplots
-    # for j in range(i, 2 * 4):
-    #     fig.delaxes(axs.flatten()[j])
+    for j in range(i, 4):
+        fig.delaxes(axs.flatten()[j])
 
-    plt.savefig('combined_rank_correlation_3.png', dpi=300, bbox_inches='tight')
+    plt.savefig('combined_correlation_3.png', dpi=300, bbox_inches='tight')
 
 
 # Call the function with the path to your CSV file
