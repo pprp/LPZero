@@ -93,8 +93,8 @@ class TreeStructure(BaseStructure):
         self._repr_geno = repr_geno
 
     def forward_tree(self, inputs, model, return_all=False):
-        # try:
-        if True:
+        try:
+        # if True:
             A1, A2 = self._genotype['input_geno']
             A1 = get_zc_candidates(
                 self._genotype['input_geno'][0],
@@ -127,25 +127,19 @@ class TreeStructure(BaseStructure):
                   for a in A2]
             A2 = [unary_operation(a, self._genotype['op_geno'][1][1])
                   for a in A2]
-            
-
-            # A1 and A2 -> assert shape is same
-            assert len(A1) == len(A2), f'Length of A1 and A2 should be same, got {len(A1)} and {len(A2)}'
-            
+                        
             # process binary operation
             A = []
             for a1, a2 in zip(A1, A2):
-                # a1 = convert_to_float(a1)
-                # a2 = convert_to_float(a2)
-                try:
-                    A.append(binary_operation(
-                        a1, a2, self._genotype['op_geno'][2]))
-                except AttributeError:
-                    breakpoint()
+                a1 = convert_to_float(a1)
+                a2 = convert_to_float(a2)
+                A.append(binary_operation(
+                    a1, a2, self._genotype['op_geno'][2]))
 
-        # except Exception as e:
-        #     print('GOT ERROR in TREE STRUCTURE:', e)
-        #     return -1
+
+        except Exception as e:
+            print('GOT ERROR in TREE STRUCTURE:', e)
+            return -1
 
         if return_all:
             return A, convert_to_float(A)
