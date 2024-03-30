@@ -7,7 +7,7 @@ from lpzero.model.flexibert.modeling_electra import (
     ElectraLayer,
     ElectraModel,
 )
-from lpzero.runner.evo_search import generate_inputs
+from lpzero.runner.evo_search_bert import generate_inputs
 from lpzero.structures.tree import TreeStructure
 
 device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')

@@ -7,3 +7,7 @@ output/*
 *.png
 pretrained_ckpt/*
 dataset/*
+lpzero.egg-info/*
+data/wikitext/*
+data/cachedir/*
+data/openwebtext/tokenized_dataset/*

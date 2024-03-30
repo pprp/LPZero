@@ -20,7 +20,6 @@ def zc_candidates(name, bn=True, copy_net=True, force_clean=True, **impl_args):
             ret = func(model, *args, **kwargs, **impl_args)
             if copy_net and force_clean:
                 import gc
-
                 import torch
 
                 del model
@@ -59,7 +58,7 @@ def load_all():
     from .zc_inputs import compute_activation  # noqa: F401
     from .zc_inputs import compute_gradient  # noqa: F401
     from .zc_inputs import compute_head  # noqa: F401
-    from .zc_inputs import compute_jacobs  # noqa: F401
+    # from .zc_inputs import compute_jacobs  # noqa: F401
     from .zc_inputs import compute_softmax  # noqa: F401
     from .zc_inputs import compute_weight  # noqa: F401
 
