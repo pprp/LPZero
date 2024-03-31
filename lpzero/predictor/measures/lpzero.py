@@ -58,6 +58,11 @@ def get_lpzero(net, inputs, targets=None, loss_fn=None, split_data=1, skip_grad=
     #     'input_geno': ['grad', 'weight'],
     #     'op_geno': [[16, 2], [17, 1], 0]
     # }
+
+    # genotype = { # 0.6917 but better from bert
+    #     'input_geno': ['softmax', 'head'],
+    #     'op_geno': [[19, 14], [8, 6], 0],
+    # }
     
     genotype = { # current best 
         'input_geno': ['weight', 'grad'],

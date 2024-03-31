@@ -9,11 +9,11 @@
 #      > ./logs/rank_corr_${METHOD}.log 2>&1 &
 
 # lpzero 
-# METHOD=lpzero
-# CUDA_VISIBLE_DEVICES=2 python lpzero/runner/eval_rank_gpt2.py \
-#     --method $METHOD \
-#     --exp_name ./saved_logs/random_GPT2_wt103 --plot --get_cost \
-#      > ./logs/rank_corr_${METHOD}.log 2>&1 &
+METHOD=lpzero
+CUDA_VISIBLE_DEVICES=2 python lpzero/runner/eval_rank_gpt2.py \
+    --method $METHOD \
+    --exp_name ./saved_logs/random_GPT2_wt103 --plot --get_cost \
+     > ./logs/rank_corr_${METHOD}_aftersearch.log 2>&1 &
 
 #synaptic_diversity 
 # METHOD=synaptic_diversity
@@ -81,8 +81,8 @@
 #      > ./logs/rank_corr_${METHOD}.log 2>&1 &
 
 # logsynflow 
-METHOD=logsynflow
-CUDA_VISIBLE_DEVICES=0 python lpzero/runner/eval_rank_gpt2.py \
-    --method $METHOD \
-    --exp_name ./saved_logs/random_GPT2_wt103 --plot --get_cost \
-     > ./logs/rank_corr_${METHOD}.log 2>&1 &
+# METHOD=logsynflow
+# CUDA_VISIBLE_DEVICES=0 python lpzero/runner/eval_rank_gpt2.py \
+#     --method $METHOD \
+#     --exp_name ./saved_logs/random_GPT2_wt103 --plot --get_cost \
+#      > ./logs/rank_corr_${METHOD}.log 2>&1 &

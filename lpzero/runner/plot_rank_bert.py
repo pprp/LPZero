@@ -15,7 +15,7 @@ mpl.rcParams.update({'font.size': 13})
 mpl.rc('xtick', labelsize=13)
 mpl.rc('ytick', labelsize=13)
 
-IS_RANK=False
+IS_RANK=True
 
 def plot_correlations_from_csv(csv_file_path):
     # Read the CSV data into a DataFrame
@@ -98,7 +98,7 @@ def plot_correlations_from_csv(csv_file_path):
     for j in range(i, 4):
         fig.delaxes(axs.flatten()[j])
 
-    plt.savefig('combined_correlation_3.png', dpi=300, bbox_inches='tight')
+    plt.savefig('combined_rank_correlation_3.png', dpi=300, bbox_inches='tight')
 
 
 # Call the function with the path to your CSV file
