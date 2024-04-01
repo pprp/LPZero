@@ -47,6 +47,7 @@ from transformers.trainer_utils import get_last_checkpoint
 from transformers.utils import send_example_telemetry
 from transformers.utils.versions import require_version
 from lpzero.model import select_config, select_model
+from lpzero.tokenizers import select_tokenizer
 
 init_expr = [
     'linear1_1(gelu(linear1_1(x,wb1)),wb2)', 'linear1_2(gelu(linear1_2(x,wb1)),wb2)', 'linear1_3(gelu(linear1_3(x,wb1)),wb2)', 'linear1_4(gelu(linear1_4(x,wb1)),wb2)',
@@ -435,40 +436,42 @@ def main():
     if model_args.stage3:
         student_model_name = model_args.student_model
 
-    student_config = select_config(student_model_name, model_args.lowercase)
-    student_model = select_model(student_model_name, model_args.lowercase, model_args.task_name, return_hid=True)
+    config = select_config(student_model_name, model_args.lowercase)
+    model = select_model(student_model_name, model_args.lowercase, model_args.task_name, return_hid=True)
+    tokenizer = select_tokenizer(
+        args.teacher_model, args.lowercase, args.task, args.vocab_path, args.max_seq_len, args.max_query_len, args.merge_path)
 
     # Load pretrained model and tokenizer
     #
     # In distributed training, the .from_pretrained methods guarantee that only one local process can concurrently
     # download model & vocab.
-    config = AutoConfig.from_pretrained(
-        model_args.config_name if model_args.config_name else model_args.model_name_or_path,
-        num_labels=num_labels,
-        finetuning_task=data_args.task_name,
-        cache_dir=model_args.cache_dir,
-        revision=model_args.model_revision,
-        token=model_args.token,
-        trust_remote_code=model_args.trust_remote_code,
-    )
-    tokenizer = AutoTokenizer.from_pretrained(
-        model_args.tokenizer_name if model_args.tokenizer_name else model_args.model_name_or_path,
-        cache_dir=model_args.cache_dir,
-        use_fast=model_args.use_fast_tokenizer,
-        revision=model_args.model_revision,
-        token=model_args.token,
-        trust_remote_code=model_args.trust_remote_code,
-    )
-    model = AutoModelForSequenceClassification.from_pretrained(
-        model_args.model_name_or_path,
-        from_tf=bool(".ckpt" in model_args.model_name_or_path),
-        config=config,
-        cache_dir=model_args.cache_dir,
-        revision=model_args.model_revision,
-        token=model_args.token,
-        trust_remote_code=model_args.trust_remote_code,
-        ignore_mismatched_sizes=model_args.ignore_mismatched_sizes,
-    )
+    # config = AutoConfig.from_pretrained(
+    #     model_args.config_name if model_args.config_name else model_args.model_name_or_path,
+    #     num_labels=num_labels,
+    #     finetuning_task=data_args.task_name,
+    #     cache_dir=model_args.cache_dir,
+    #     revision=model_args.model_revision,
+    #     token=model_args.token,
+    #     trust_remote_code=model_args.trust_remote_code,
+    # )
+    # tokenizer = AutoTokenizer.from_pretrained(
+    #     model_args.tokenizer_name if model_args.tokenizer_name else model_args.model_name_or_path,
+    #     cache_dir=model_args.cache_dir,
+    #     use_fast=model_args.use_fast_tokenizer,
+    #     revision=model_args.model_revision,
+    #     token=model_args.token,
+    #     trust_remote_code=model_args.trust_remote_code,
+    # )
+    # model = AutoModelForSequenceClassification.from_pretrained(
+    #     model_args.model_name_or_path,
+    #     from_tf=bool(".ckpt" in model_args.model_name_or_path),
+    #     config=config,
+    #     cache_dir=model_args.cache_dir,
+    #     revision=model_args.model_revision,
+    #     token=model_args.token,
+    #     trust_remote_code=model_args.trust_remote_code,
+    #     ignore_mismatched_sizes=model_args.ignore_mismatched_sizes,
+    # )
 
     # Preprocessing the raw_datasets
     if data_args.task_name is not None:
