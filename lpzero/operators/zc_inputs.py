@@ -9,6 +9,7 @@ from lpzero.model.hf_gpt2.model_hf_gpt2 import HfGPT2, HfGPT2Flex
 from . import zc_candidates
 from lpzero.predictor.measures.jacob_cov import modify_net, get_batch_jacobian
 import transformers 
+from transformers.models.llama.modeling_llama import LlamaDecoderLayer, LlamaForCausalLM
 
 # @zc_candidates('jacobs')
 # def compute_jacobs(model, inputs, targets=None, **kwargs) -> List:
@@ -152,6 +153,26 @@ def compute_gradient(model, inputs, targets=None, **kwargs) -> List:
                 if layer.weight.grad is not None:
                     grad_output.append(layer.weight.grad)
         return grad_output
+    elif isinstance(model, LlamaForCausalLM):
+        # Perform the forward pass
+        output = model(**inputs).logits
+
+        # Zero out gradients before the backward pass
+        model.zero_grad()
+
+        # Perform the backward pass
+        output.backward(torch.ones_like(output))
+
+        # Collect the gradients
+        grad_output = []
+        for layer in model.modules():
+            if isinstance(layer, LlamaDecoderLayer):
+                for sublayer in layer.modules():
+                    if isinstance(sublayer, nn.Linear):
+                        if sublayer.weight.grad is not None:
+                            grad_output.append(sublayer.weight.grad)
+
+        return grad_output
     else: 
         raise NotImplementedError(f"model type {type(model)} is not supported for gradients")
 
@@ -175,5 +196,14 @@ def compute_weight(model, inputs, targets=None, **kwargs) -> List:
                 if layer.weight is not None:
                     weight_list.append(layer.weight.detach())
         return weight_list
+    elif isinstance(model, LlamaForCausalLM):
+        weight_list = []
+        for layer in model.modules():
+            if isinstance(layer, LlamaDecoderLayer):
+                for sublayer in layer.modules():
+                    if isinstance(sublayer, nn.Linear):
+                        if sublayer.weight is not None:
+                            weight_list.append(sublayer.weight.detach())
+        return weight_list 
     else:
         raise NotImplementedError(f"model type {type(model)} is not supported for weights")
