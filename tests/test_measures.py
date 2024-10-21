@@ -440,7 +440,7 @@ def main():
 
     # build dataloader using lm1b
     corpus = get_lm_corpus(
-        datadir='/mnt/sdb/dongpeijie/workspace/LPZero/data/wikitext/wikitext-103/',
+        datadir='/mnt/sdb/xxx/workspace/LPZero/data/wikitext/wikitext-103/',
         cachedir='./data/cachedir',
         dataset="wt103",
         vocab_type="word", # gpt2
@@ -491,7 +491,7 @@ inputs = generate_inputs()
 
 # build dataloader using lm1b
 corpus = get_lm_corpus(
-    datadir='/mnt/sdb/dongpeijie/workspace/LPZero/data/wikitext/wikitext-103/',
+    datadir='/mnt/sdb/xxx/workspace/LPZero/data/wikitext/wikitext-103/',
     cachedir='./data/cachedir',
     dataset="wt103",
     vocab_type="word", # gpt2

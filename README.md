@@ -1,21 +1,22 @@
 # LPZero: Language Model Zero-cost Proxy Search from Zero
 
-This repository contains the implementation of LPZero, a framework for automatically designing zero-cost proxies for language models, achieving superior ranking consistency and performance.
+LPZero is a framework for automatically designing zero-cost proxies for language models, achieving superior ranking consistency and performance.
 
 ## Overview
 
 LPZero leverages genetic programming to optimize the design of zero-cost proxies, modeled as symbolic expressions. It includes a Rule-based Pruning Strategy (RPS) to enhance search efficiency by eliminating unpromising proxies early in the process.
 
-## Features
+## Key Features
 
-- Automated zero-cost proxy design
-- Genetic programming for proxy optimization
-- Rule-based Pruning Strategy (RPS) for efficient search
-- Evaluation on models like FlexiBERT, GPT-2, and LLaMA-7B
+- Automated zero-cost proxy design for language models
+- Genetic programming algorithm for proxy optimization
+- Rule-based Pruning Strategy (RPS) for efficient search space exploration
+- Evaluation on state-of-the-art models like FlexiBERT, GPT-2, and LLaMA-7B
+- Comprehensive set of metrics for model evaluation
 
 ## Installation
 
-Clone the repository and install the required dependencies:
+1. Clone the repository:
 
 ```bash
 git clone https://github.com/pprp/LPZero.git
@@ -25,10 +26,20 @@ pip install -r requirements.txt
 
 ## Usage
 
-Run the main script to start the search process:
+How to rank? 
 
-```bash
-python main.py
+```bash 
+METHOD=lpzero
+CUDA_VISIBLE_DEVICES=2 python lpzero/runner/eval_rank_gpt2.py \
+    --method $METHOD \
+    --exp_name ./saved_logs/random_GPT2_wt103 --plot --get_cost \
+     > ./logs/rank_corr_${METHOD}_aftersearch.log 2>&1 &
+```
+
+How to train? 
+
+```bash 
+bash scripts/run_train.sh
 ```
 
 ## Experiments
@@ -48,3 +59,17 @@ Contributions are welcome! Please submit a pull request or open an issue for any
 ## License
 
 This project is licensed under the MIT License.
+
+
+## Citation
+
+If you find this work useful in your research, please consider citing:
+
+```
+@inproceedings{Dong2024LPZeroLM,
+  title={LPZero: Language Model Zero-cost Proxy Search from Zero},
+  author={Peijie Dong and Lujun Li and Xiang Liu and Zhenheng Tang and Xuebo Liu and Qiang Wang and Xiaowen Chu},
+  year={2024},
+  url={https://arxiv.org/abs/2410.04808}
+}
+```
