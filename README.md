@@ -50,11 +50,8 @@ The framework has been tested on:
 - **GPT-2**
 - **LLaMA-7B**
 
-For detailed experimental results, refer to the `experiments` folder.
+For detailed experimental results, refer to the `exps` folder.
 
-## Contributing
-
-Contributions are welcome! Please submit a pull request or open an issue for any suggestions or bug reports.
 
 ## License
 
@@ -73,3 +70,6 @@ If you find this work useful in your research, please consider citing:
   url={https://arxiv.org/abs/2410.04808}
 }
 ```
+
+## Thanks
+We appreciate the contribution of https://github.com/aaronserianni/training-free-nas and https://github.com/IntelLabs/Hardware-Aware-Automated-Machine-Learning
