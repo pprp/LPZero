@@ -1,34 +1,50 @@
-# Training-free Neural Architecture Search for RNNs and Transformers [\[paper\]](https://aclanthology.org/2023.acl-long.142/) [\[arXiv\]](http://arxiv.org/abs/2306.00288/)
-### Aaron Serianni (Princeton University) and [Jugal Kalita](https://eas.uccs.edu/cs/about/faculty/jugal-kalita) (University of Colorado at Colorado Springs)
+# LPZero: Language Model Zero-cost Proxy Search from Zero
 
-Neural architecture search (NAS) has allowed for the automatic creation of new and effective neural network architectures, offering an alternative to the laborious process of manually designing complex architectures. However, traditional NAS algorithms are slow and require immense amounts of computing power. Recent research has investigated training-free NAS metrics for image classification architectures, drastically speeding up search algorithms. In this paper, we investigate training-free NAS metrics for recurrent neural network (RNN) and BERT-based transformer architectures, targeted towards language modeling tasks. First, we develop a new training-free metric, named hidden covariance, that predicts the trained performance of an RNN architecture and significantly outperforms existing training-free metrics. We experimentally evaluate the effectiveness of the hidden covariance metric on the NAS-Bench-NLP benchmark. Second, we find that the current search space paradigm for transformer architectures is not optimized for training-free neural architecture search. Instead, a simple qualitative analysis can effectively shrink the search space to the best performing architectures. This conclusion is based on our investigation of existing training-free metrics and new metrics developed from recent transformer pruning literature, evaluated on our own benchmark of trained BERT architectures. Ultimately, our analysis shows that the architecture search space and the training-free metric must be developed together in order to achieve effective results.
+This repository contains the implementation of LPZero, a framework for automatically designing zero-cost proxies for language models, achieving superior ranking consistency and performance.
 
-**Presented and published as a long paper at ACL 2023.**
+## Overview
 
-# Code
+LPZero leverages genetic programming to optimize the design of zero-cost proxies, modeled as symbolic expressions. It includes a Rule-based Pruning Strategy (RPS) to enhance search efficiency by eliminating unpromising proxies early in the process.
 
-All dataset files and training-free metric results are in [`data/`](data/). The NAS-Bench-BERT benchmark is described in [`data/BERT_benchmark.json`](data/BERT_benchmark.json).
+## Features
 
-Required packages are listed in [`requirements.txt`](requirements.txt), and can be installed with `pip install -r requirements.txt`. The Docker file used to define the MacOS container in which code was run is also included.
+- Automated zero-cost proxy design
+- Genetic programming for proxy optimization
+- Rule-based Pruning Strategy (RPS) for efficient search
+- Evaluation on models like FlexiBERT, GPT-2, and LLaMA-7B
 
-Run [`BERT_metrics.ipyb`](BERT_metrics.ipynb) and [`RNN_metrics.ipyb`](BERT_metrics.ipynb) to reproduce results, and [`BERT_stats.ipyb`](BERT_stats.ipynb) and [`RNN_stats.ipyb`](RNN_stats.ipynb) to create figures.
+## Installation
 
-[`nas_runner.ipynb`](nas_runner.ipynb) reproduces the NAS-Bench-BERT benchmark, and requires usage of Google Colab and Google Cloud Storage for TPU training of transformers. [`space_maker.ipynb`](space_maker.ipynb) generates the config file that defines NAS-Bench-BERT.
+Clone the repository and install the required dependencies:
 
-
-# Citation
-If you use our code for your paper or work, please cite:
-
-```bibtex
-@inproceedings{serianni-kalita-2023-training,
-    title = "Training-free Neural Architecture Search for {RNN}s and Transformers",
-    author = "Serianni, Aaron and Kalita, Jugal",
-    booktitle = "Proceedings of the 61st Annual Meeting of the Association for Computational Linguistics (Volume 1: Long Papers)",
-    month = jul,
-    year = "2023",
-    address = "Toronto, Canada",
-    publisher = "Association for Computational Linguistics",
-    url = "https://aclanthology.org/2023.acl-long.142",
-    pages = "2522--2540"
-}
+```bash
+git clone https://github.com/pprp/LPZero.git
+cd LPZero
+pip install -r requirements.txt
 ```
+
+## Usage
+
+Run the main script to start the search process:
+
+```bash
+python main.py
+```
+
+## Experiments
+
+The framework has been tested on:
+
+- **FlexiBERT**
+- **GPT-2**
+- **LLaMA-7B**
+
+For detailed experimental results, refer to the `experiments` folder.
+
+## Contributing
+
+Contributions are welcome! Please submit a pull request or open an issue for any suggestions or bug reports.
+
+## License
+
+This project is licensed under the MIT License.
